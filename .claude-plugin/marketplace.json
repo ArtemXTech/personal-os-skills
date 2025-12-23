@@ -1,0 +1,22 @@
+{
+  "name": "personal-os-skills",
+  "owner": {
+    "name": "Artem Zhutov",
+    "email": "artem@artemzhutov.com"
+  },
+  "metadata": {
+    "description": "Claude Code skills for Personal OS workflows with Obsidian",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "tasknotes-skill",
+      "description": "Manage Obsidian tasks via TaskNotes plugin API",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/tasknotes"
+      ]
+    }
+  ]
+}
