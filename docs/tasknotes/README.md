@@ -32,5 +32,5 @@ After installation, ask Claude:
 
 ## Resources
 
-- [Blog post](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-with-TaskNotes)
+- [Blog post](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-(TaskNotes-+-Claude-Code))
 - [Video demo](https://youtu.be/ePFAVGcPh7U)
