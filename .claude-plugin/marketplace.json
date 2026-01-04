@@ -17,6 +17,15 @@
       "skills": [
         "./skills/tasknotes"
       ]
+    },
+    {
+      "name": "bases-skill",
+      "description": "Query Obsidian Bases via the Bases Query plugin (RPC)",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/bases"
+      ]
     }
   ]
 }
