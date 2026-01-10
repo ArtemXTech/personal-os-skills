@@ -55,6 +55,11 @@ def create_dashboard(output):
 
     conn.close()
 
+    # Prepare JSON for charts
+    daily_json = json.dumps([{'date': d[0], 'words': d[1] or 0} for d in daily])
+    hourly_json = json.dumps([{'hour': h[0], 'words': h[1] or 0} for h in hourly if h[0]])
+    app_json = json.dumps([{'app': a[0], 'words': a[1] or 0} for a in apps])
+
     # Create HTML
     html = f'''<!DOCTYPE html>
 <html>
@@ -115,9 +120,9 @@ def create_dashboard(output):
     </div>
 
     <script>
-        const dailyData = {json.dumps([{{'date': d[0], 'words': d[1] or 0}} for d in daily])};
-        const hourlyData = {json.dumps([{{'hour': h[0], 'words': h[1] or 0}} for h in hourly if h[0]])};
-        const appData = {json.dumps([{{'app': a[0], 'words': a[1] or 0}} for a in apps])};
+        const dailyData = {daily_json};
+        const hourlyData = {hourly_json};
+        const appData = {app_json};
 
         // Daily chart
         new Chart(document.getElementById('dailyChart'), {{

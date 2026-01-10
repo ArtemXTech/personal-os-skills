@@ -2,6 +2,8 @@
 
 Claude Code skills for Obsidian workflows.
 
+> **Workshop Jan 17-18** - Build these skills from scratch. [workshop.artemzhutov.com](https://workshop.artemzhutov.com/)
+
 ## Installation
 
 1. Add marketplace (run in Claude Code):
@@ -17,6 +19,7 @@ Claude Code skills for Obsidian workflows.
 
 | Skill | Description | Resources |
 |-------|-------------|-----------|
+| [wispr-flow](skills/wispr-flow/) | Analyze voice dictation data from Wispr Flow | Stats, search, export, dashboard |
 | [tasknotes](docs/tasknotes/) | Manage Obsidian tasks via TaskNotes API | [Video](https://youtu.be/ePFAVGcPh7U) · [Blog](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-(TaskNotes-+-Claude-Code)) |
 | [bases](skills/bases/) | Query Obsidian Bases via RPC | [Plugin](https://github.com/ArtemXTech/obsidian-bases-query) (BRAT) |
 
