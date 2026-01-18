@@ -2,7 +2,7 @@
 
 Claude Code skills for Obsidian workflows.
 
-> **Workshop Jan 17-18** - Build these skills from scratch. [workshop.artemzhutov.com](https://workshop.artemzhutov.com/)
+> **Workshop Feb 7-8** - Build these skills from scratch. [workshop.artemzhutov.com](https://workshop.artemzhutov.com/)
 
 ## Installation
 
