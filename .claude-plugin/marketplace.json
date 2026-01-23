@@ -2,7 +2,7 @@
   "name": "personal-os-skills",
   "owner": {
     "name": "Artem Zhutov",
-    "email": "artem@artemzhutov.com"
+    "email": "artem.zhutov.perfected618@simplelogin.com"
   },
   "metadata": {
     "description": "Claude Code skills for Personal OS workflows with Obsidian",
@@ -10,21 +10,30 @@
   },
   "plugins": [
     {
+      "name": "granola-skill",
+      "description": "Sync Granola meeting notes to Obsidian vault",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/granola"
+      ]
+    },
+    {
+      "name": "wispr-flow-skill",
+      "description": "Analyze voice dictation data from Wispr Flow",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/wispr-flow"
+      ]
+    },
+    {
       "name": "tasknotes-skill",
       "description": "Manage Obsidian tasks via TaskNotes plugin API",
       "source": "./",
       "strict": false,
       "skills": [
         "./skills/tasknotes"
-      ]
-    },
-    {
-      "name": "bases-skill",
-      "description": "Query Obsidian Bases via the Bases Query plugin (RPC)",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./skills/bases"
       ]
     }
   ]
