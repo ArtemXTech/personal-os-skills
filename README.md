@@ -22,7 +22,6 @@ Claude Code skills for Obsidian workflows.
 | [granola](skills/granola/) | Sync Granola meeting notes to Obsidian | Local cache, no API needed |
 | [wispr-flow](skills/wispr-flow/) | Analyze voice dictation data from Wispr Flow | Stats, search, export, dashboard |
 | [tasknotes](docs/tasknotes/) | Manage Obsidian tasks via TaskNotes API | [Video](https://youtu.be/ePFAVGcPh7U) · [Blog](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-(TaskNotes-+-Claude-Code)) |
-| [bases](skills/bases/) | Query Obsidian Bases via RPC | [Plugin](https://github.com/ArtemXTech/obsidian-bases-query) (BRAT) |
 
 ## Links
 
