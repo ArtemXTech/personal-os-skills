@@ -2,7 +2,7 @@
 
 Claude Code skills for Obsidian workflows.
 
-> **Workshop Feb 7-8** - Build these skills from scratch. [workshop.artemzhutov.com](https://workshop.artemzhutov.com/)
+> **Claude Code Camp** - 6 weeks, 12 live sessions. [lab.artemzhutov.com](https://lab.artemzhutov.com/)
 
 ## Installation
 
