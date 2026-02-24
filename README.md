@@ -2,7 +2,7 @@
 
 Claude Code skills for Obsidian workflows.
 
-> **Claude Code Camp** - 6 weeks, 12 live sessions. [lab.artemzhutov.com](https://lab.artemzhutov.com/)
+> **Claude Code x Obsidian Lab** - 6 weeks, 12 live sessions. [lab.artemzhutov.com](https://lab.artemzhutov.com/)
 
 ## Installation
 
