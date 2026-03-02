@@ -23,6 +23,8 @@ Claude Code skills for Obsidian workflows.
 | [wispr-flow](skills/wispr-flow/) | Analyze voice dictation data from Wispr Flow | Stats, search, export, dashboard |
 | [tasknotes](docs/tasknotes/) | Manage Obsidian tasks via TaskNotes API | [Video](https://youtu.be/ePFAVGcPh7U) · [Blog](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-(TaskNotes-+-Claude-Code)) |
 | [notebooklm](skills/notebooklm/) | Import NotebookLM notebooks into Obsidian as linked knowledge graphs | [Video](https://youtu.be/qiOu7Ptjxng) |
+| [recall](skills/recall/) | Load context from previous sessions - temporal, topic search (QMD), graph visualization | [Video](https://youtu.be/RDoTY4_xh0s) · [Setup](docs/memory-skills-setup.md) |
+| [sync-claude-sessions](skills/sync-claude-sessions/) | Export Claude Code conversations to Obsidian markdown with auto-sync hooks | [Setup](docs/memory-skills-setup.md) |
 
 ## Links
 

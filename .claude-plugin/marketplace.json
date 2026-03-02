@@ -44,6 +44,24 @@
       "skills": [
         "./skills/notebooklm"
       ]
+    },
+    {
+      "name": "recall-skill",
+      "description": "Load context from vault memory - temporal, topic (BM25 via QMD), and graph visualization",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/recall"
+      ]
+    },
+    {
+      "name": "sync-claude-sessions-skill",
+      "description": "Sync Claude Code sessions to Obsidian markdown with auto-export and hooks",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/sync-claude-sessions"
+      ]
     }
   ]
 }
