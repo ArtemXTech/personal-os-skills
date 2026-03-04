@@ -22,7 +22,8 @@ If auth error: run `notebooklm login` to re-authenticate.
 ## Step 2: Ask the Question
 
 ```bash
-notebooklm ask --new --json "{question}" > /tmp/qa-output.json
+QA_FILE=$(mktemp /tmp/notebooklm-qa-XXXXXX.json)
+notebooklm ask --new --json "{question}" > "$QA_FILE"
 ```
 
 Flags:
@@ -32,10 +33,11 @@ Flags:
 ## Step 3: Extract Passages
 
 ```bash
+PASSAGE_MAP=$(mktemp /tmp/notebooklm-passages-XXXXXX.json)
 python3 .claude/skills/notebooklm/scripts/extract_passages.py \
-  --qa /tmp/qa-output.json \
-  --sources /tmp/notebooklm-sources.json \
-  --slug {notebook-slug} > /tmp/passage-map.json
+  --qa "$QA_FILE" \
+  --sources "$SOURCES_FILE" \
+  --slug {notebook-slug} > "$PASSAGE_MAP"
 ```
 
 This writes `## Cited Passages / ### Passage N` sections into source files using the `cited_text` from references (the actual transcript chunks NotebookLM used as evidence). Idempotent - skips sources that already have passages. Outputs a passage mapping JSON for the resolver.
@@ -46,10 +48,10 @@ For multiple Q&As, pass all JSON files: `--qa /tmp/qa-1.json /tmp/qa-2.json ...`
 
 ```bash
 python3 .claude/skills/notebooklm/scripts/resolve_citations.py \
-  --qa /tmp/qa-output.json \
-  --sources /tmp/notebooklm-sources.json \
+  --qa "$QA_FILE" \
+  --sources "$SOURCES_FILE" \
   --slug {notebook-slug} \
-  --passages /tmp/passage-map.json \
+  --passages "$PASSAGE_MAP" \
   --title "{title}" \
   --dashboard "{dashboard-title}" \
   --output "Notes/NotebookLM/{notebook-slug}/QA/{date} {title}.md"

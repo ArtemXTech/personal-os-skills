@@ -9,10 +9,11 @@ Creates one .md file per source with frontmatter + AI-generated source guide.
 """
 import argparse
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
+
+from shared import safe_filename, validate_slug, yaml_escape, markdown_heading_safe, wikilink_safe
 
 VAULT = Path.cwd()  # Expected to run from vault root
 
@@ -25,15 +26,6 @@ TYPE_MAP = {
     "SourceType.GOOGLE_DOCS": "gdocs",
     "SourceType.GOOGLE_SLIDES": "gslides",
 }
-
-
-def safe_filename(title: str) -> str:
-    """Make title safe for filesystem."""
-    title = re.sub(r'[/:*?"<>|]', '-', title)
-    title = re.sub(r'\s+', ' ', title).strip()
-    if len(title) > 120:
-        title = title[:120].rstrip(' -')
-    return title
 
 
 def fetch_guide(source_id: str) -> tuple[str, list[str], list[str]]:
@@ -58,6 +50,7 @@ def main():
     parser.add_argument("--dashboard", required=True, help="Dashboard title for related links")
     parser.add_argument("--skip-guides", action="store_true", help="Skip fetching AI source guides")
     args = parser.parse_args()
+    validate_slug(args.slug)
 
     with open(args.sources) as f:
         data = json.load(f)
@@ -109,13 +102,19 @@ def main():
         # Build topics frontmatter
         topics_yaml = ""
         if keywords:
-            topics_yaml = "topics:\n" + "\n".join(f'  - "[[{k}]]"' for k in keywords) + "\n"
+            safe_topics = [wikilink_safe(k) for k in keywords]
+            topics_yaml = "topics:\n" + "\n".join(f'  - "[[{t}]]"' for t in safe_topics) + "\n"
+
+        safe_source_id = yaml_escape(source_id)
+        safe_notebook_id = yaml_escape(notebook_id)
+        safe_url = yaml_escape(url)
+        safe_title = markdown_heading_safe(title)
 
         content = f"""---
 type: notebook-source
-source_id: "{source_id}"
-notebook_id: "{notebook_id}"
-url: "{url}"
+source_id: "{safe_source_id}"
+notebook_id: "{safe_notebook_id}"
+url: "{safe_url}"
 source_type: {source_type}
 status: active
 date: {date}
@@ -123,7 +122,7 @@ date: {date}
   - "[[{dashboard_path}]]"
 ---
 
-# {title}
+# {safe_title}
 
 ## Source Guide
 

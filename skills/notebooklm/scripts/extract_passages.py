@@ -16,16 +16,9 @@ import re
 import sys
 from pathlib import Path
 
+from shared import safe_filename, validate_slug
+
 VAULT = Path.cwd()
-
-
-def safe_filename(title: str) -> str:
-    """Same logic as import_sources.py."""
-    title = re.sub(r'[/:*?"<>|]', '-', title)
-    title = re.sub(r'\s+', ' ', title).strip()
-    if len(title) > 120:
-        title = title[:120].rstrip(' -')
-    return title
 
 
 def main():
@@ -34,6 +27,7 @@ def main():
     parser.add_argument("--sources", required=True, help="Sources JSON file")
     parser.add_argument("--slug", required=True, help="Notebook slug")
     args = parser.parse_args()
+    validate_slug(args.slug)
 
     # Build source_id -> title mapping
     with open(args.sources) as f:

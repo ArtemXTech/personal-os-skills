@@ -28,6 +28,8 @@ import re
 import sys
 from pathlib import Path
 
+from shared import safe_filename, validate_slug
+
 VAULT = Path.cwd()  # Expected to run from vault root
 
 
@@ -41,12 +43,7 @@ def build_source_map(sources_file: str, slug: str) -> dict[str, str]:
         title = s["title"].strip()
         if title == "- YouTube" or len(title) < 3:
             continue
-        # Same safe_filename logic as import_sources.py
-        safe = re.sub(r'[/:*?"<>|]', '-', title)
-        safe = re.sub(r'\s+', ' ', safe).strip()
-        if len(safe) > 120:
-            safe = safe[:120].rstrip(' -')
-        mapping[s["id"]] = safe
+        mapping[s["id"]] = safe_filename(title)
     return mapping
 
 
@@ -190,6 +187,7 @@ def main():
     parser.add_argument("--passages", help="Passage mapping JSON from extract_passages.py (enables #Passage N anchors)")
     parser.add_argument("--date", help="Date for frontmatter (default: today)")
     args = parser.parse_args()
+    validate_slug(args.slug)
 
     source_map = build_source_map(args.sources, args.slug)
     print(f"Source map: {len(source_map)} entries", file=sys.stderr)
@@ -286,7 +284,10 @@ related:
 {dvjs}
 {uncited_section}"""
 
-    output_path = VAULT / args.output
+    output_path = (VAULT / args.output).resolve()
+    if not str(output_path).startswith(str(VAULT.resolve())):
+        print(f"ERROR: output path escapes vault: {args.output}", file=sys.stderr)
+        sys.exit(1)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content)
     print(f"CREATED: {args.output} ({len(resolved)} chars, {stats['cited_sources']}/{stats['total_sources']} sources cited)")

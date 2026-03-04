@@ -34,7 +34,8 @@ mkdir -p "Notes/NotebookLM/{notebook-slug}/QA"
 ## Step 4: Export Source List
 
 ```bash
-notebooklm source list --json > /tmp/notebooklm-sources.json
+SOURCES_FILE=$(mktemp /tmp/notebooklm-sources-XXXXXX.json)
+notebooklm source list --json > "$SOURCES_FILE"
 ```
 
 Inspect the JSON to understand the schema. Key fields: `id`, `title`, `type`, `url`, `created_at`.
@@ -45,7 +46,7 @@ Run the import script:
 
 ```bash
 python3 .claude/skills/notebooklm/scripts/import_sources.py \
-  --sources /tmp/notebooklm-sources.json \
+  --sources "$SOURCES_FILE" \
   --slug {notebook-slug} \
   --dashboard "{dashboard-title}"
 ```
