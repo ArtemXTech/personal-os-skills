@@ -28,7 +28,7 @@ Two skills:
 
 3. Install Python deps (for graph visualization):
    ```bash
-   pip install networkx pyvis
+   uv sync
    ```
 
 4. Try it:
@@ -43,12 +43,23 @@ Temporal recall works immediately - it reads native Claude Code or Codex session
 
 See [AGENTS.md](AGENTS.md) for complete setup instructions including QMD collections, auto-sync hooks, and auto-indexing.
 
+## Native Obsidian Graph Export
+
+The graph script can export native Obsidian graph artifacts as linked Markdown notes:
+
+```bash
+uv run python skills/recall/scripts/session-graph.py last week \
+  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+```
+
+This creates session notes, file notes, and an index note connected with wikilinks so Obsidian's graph view can render them directly.
+
 ## Tests
 
 Run the session-backend regression tests with:
 
 ```bash
-python3 -m unittest discover -s tests -v
+uv run python -m unittest discover -s tests -v
 ```
 
 ## Video

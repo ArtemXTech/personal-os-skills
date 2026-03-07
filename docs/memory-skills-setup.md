@@ -13,6 +13,13 @@ python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
   --path skills/sync-claude-sessions
 ```
 
+Then install the Python environment from the repo checkout:
+
+```bash
+cd /path/to/personal-os-skills
+uv sync
+```
+
 ## Prerequisites
 
 - Claude Code installed and working
@@ -68,16 +75,16 @@ Replace `/path/to/your/vault` with your actual Obsidian vault path.
 
 ## Step 4: Install Python Dependencies
 
-The graph visualization requires NetworkX and pyvis:
+The graph visualization requires NetworkX and pyvis. This repo now includes a `uv` project:
 
 ```bash
-pip install networkx pyvis
+uv sync
 ```
 
-Or with uv:
+Run the scripts with `uv run`:
 
 ```bash
-uv pip install networkx pyvis
+uv run python skills/recall/scripts/session-graph.py today --min-msgs 1 --min-files 1
 ```
 
 ## Step 5: Set Up Auto-Sync Hook (Optional)
@@ -159,6 +166,32 @@ Add a `SessionEnd` hook to `~/.claude/settings.json`:
 alias cs="python3 .claude/skills/sync-claude-sessions/scripts/claude-sessions"
 ```
 
+Codex-friendly alias from the repo checkout:
+
+```bash
+alias cs="SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions"
+```
+
+## Step 8: Codex Workflow
+
+Typical Codex workflow from the repo checkout:
+
+```bash
+# Export saved Codex sessions into Obsidian markdown
+SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions export --all
+
+# Recall recent Codex sessions by date
+SESSION_BACKEND=codex uv run python skills/recall/scripts/recall-day.py list last week --min-msgs 1
+
+# Build the interactive HTML graph plus native Obsidian graph notes
+SESSION_BACKEND=codex uv run python skills/recall/scripts/session-graph.py last week \
+  --min-msgs 1 \
+  --min-files 1 \
+  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+```
+
+When you export a Codex session note, `cs resume` will resume it with `codex resume`, and `cs resume --fork` will use `codex fork`.
+
 ## How It Works
 
 ### /recall (temporal)
@@ -186,6 +219,13 @@ Interactive HTML visualization of sessions and files touched. Requires networkx 
 /recall graph yesterday
 ```
 
+Native Obsidian graph export:
+
+```bash
+uv run python skills/recall/scripts/session-graph.py last week \
+  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+```
+
 ### /sync-claude-sessions
 Export conversations to Obsidian markdown with frontmatter, artifacts, and preserved notes.
 
@@ -206,4 +246,5 @@ cs close "done"      # Mark session done
 All scripts auto-detect paths:
 - **Vault directory**: walks up from CWD looking for `.obsidian/` folder, or uses `VAULT_DIR` env var
 - **Claude project directory**: derives from CWD using Claude Code's encoding scheme (`/path/to/dir` -> `-path-to-dir`)
+- **Codex session directory**: uses `~/.codex/sessions` when `SESSION_BACKEND=codex` or when Claude project logs are not present
 - **No hardcoded paths** - works with any vault, any username, any OS

@@ -32,6 +32,21 @@ python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
 
 Restart Codex after installation.
 
+## Python Setup
+
+The graph and session scripts now use a minimal `uv` project:
+
+```bash
+cd personal-os-skills
+uv sync
+```
+
+Run scripts with `uv run`, for example:
+
+```bash
+uv run python skills/recall/scripts/session-graph.py today --min-msgs 1 --min-files 1
+```
+
 ## Available Skills
 
 | Skill | Description | Resources |

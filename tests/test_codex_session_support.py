@@ -181,6 +181,40 @@ class CodexSessionSupportTests(unittest.TestCase):
             self.assertIn("tools/demo/README.md", result["files"])
             self.assertIn("tools/demo/src/app.py", result["files"])
 
+    def test_session_graph_exports_obsidian_notes(self):
+        os.environ["SESSION_BACKEND"] = "codex"
+        graph_mod = load_module(GRAPH_SCRIPT, "session_graph_obsidian_test")
+        with tempfile.TemporaryDirectory() as tmp:
+            export_dir = Path(tmp) / "obsidian-graph"
+            sessions = [
+                {
+                    "session_id": "sess-5",
+                    "start_time": graph_mod.datetime(2026, 3, 8, 10, 0, tzinfo=graph_mod.timezone.utc),
+                    "title": "Build graph support",
+                    "msg_count": 12,
+                    "filepath": "/root/.codex/sessions/example.jsonl",
+                    "files": {"tools/demo/README.md", "tools/demo/src/app.py"},
+                }
+            ]
+
+            info = graph_mod.export_obsidian_graph_artifacts(
+                sessions,
+                export_dir,
+                "2026-03-08",
+                min_files=1,
+            )
+
+            self.assertEqual(info["sessions"], 1)
+            self.assertEqual(info["files"], 2)
+            index = (export_dir / "session-graph-index.md").read_text(encoding="utf-8")
+            self.assertIn("[[session-sess-5|Build graph support]]", index)
+
+            session_note = (export_dir / "session-sess-5.md").read_text(encoding="utf-8")
+            self.assertIn("[[file-tools__demo__README_md|README.md]]", session_note)
+
+            file_note = (export_dir / "file-tools__demo__README_md.md").read_text(encoding="utf-8")
+            self.assertIn("[[session-sess-5]]", file_note)
+
 
 if __name__ == "__main__":
     unittest.main()

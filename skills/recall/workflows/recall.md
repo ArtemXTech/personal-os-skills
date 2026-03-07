@@ -151,9 +151,17 @@ Options:
 - `--all-projects` - scan all projects
 - `-o PATH` - custom output path (default: /tmp/session-graph.html)
 - `--no-open` - don't auto-open browser
+- `--obsidian-export DIR` - export native Obsidian markdown graph notes
 
 Opens interactive HTML in browser. Session nodes colored by day, file nodes colored by folder.
 Tell the user the node/edge counts and what to look for (clusters, shared files).
+
+When `--obsidian-export DIR` is set, also generate:
+- session notes
+- file notes
+- an index note
+
+These are linked with wikilinks so Obsidian's graph view can render the session/file network natively.
 
 ## Notes
 

@@ -40,7 +40,13 @@ You can auto-index sessions into QMD on every session end via a Claude Code hook
 /recall graph last 3 days      # recent activity window
 ```
 
-Graph options: `--min-files 5` for cleaner graphs (only sessions touching 5+ files), `--all-projects` to scan beyond current vault.
+Graph options: `--min-files 5` for cleaner graphs (only sessions touching 5+ files), `--all-projects` to scan beyond current vault, `--obsidian-export DIR` to create native Obsidian graph notes.
+
+Example:
+```bash
+uv run python ~/.codex/skills/recall/scripts/session-graph.py last week \
+  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+```
 
 ## Workflow
 

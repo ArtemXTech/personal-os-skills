@@ -4,6 +4,20 @@ Enable automatic syncing of Claude Code sessions to Obsidian.
 
 Codex note: the export/resume script supports Codex rollouts, but the live hook examples below are still Claude-specific.
 
+If you are using these scripts from the repo checkout, install the Python deps once with:
+
+```bash
+uv sync
+```
+
+Codex workflow from the repo checkout:
+
+```bash
+SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions export --all
+SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions list --all
+SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions resume --pick
+```
+
 ## 1. Add Hooks to Settings
 
 Edit `~/.claude/settings.json`:

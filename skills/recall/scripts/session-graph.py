@@ -7,7 +7,7 @@ Usage:
 DATE_EXPR: same as recall-day.py (yesterday, "last week", 2026-02-25, etc.)
 --day: filter to specific day within range (e.g. "monday", "2026-02-20")
 
-Outputs interactive HTML to /tmp/session-graph.html and opens in browser.
+Outputs interactive HTML and can also export native Obsidian markdown graph artifacts.
 Features: Obsidian-style theme, neighbor highlighting on hover, click-to-select
 nodes, copy selected file paths to clipboard.
 """
@@ -1239,6 +1239,145 @@ def filter_sessions_by_day(sessions: list, day_filter: str) -> list:
     return sessions
 
 
+def select_graph_sessions(sessions: list, min_files: int) -> tuple[list, set]:
+    """Apply the same file-noise and min-file filtering used for the rendered graph."""
+    file_freq = Counter()
+    for session in sessions:
+        for fp in session['files']:
+            file_freq[fp] += 1
+
+    noise_threshold = max(3, len(sessions) * 0.6)
+    noisy_files = {fp for fp, count in file_freq.items() if count > noise_threshold}
+
+    selected = []
+    for session in sessions:
+        clean_files = sorted(session['files'] - noisy_files)
+        if len(clean_files) < min_files:
+            continue
+        enriched = dict(session)
+        enriched['clean_files'] = clean_files
+        selected.append(enriched)
+
+    return selected, noisy_files
+
+
+def slugify_note_name(value: str) -> str:
+    """Create a filesystem- and wikilink-friendly note name stem."""
+    value = value.replace('/', '__')
+    value = re.sub(r'[^A-Za-z0-9._-]+', '-', value)
+    value = re.sub(r'-{2,}', '-', value).strip('-_.')
+    return value or "item"
+
+
+def file_note_stem(path: str) -> str:
+    """Build a stable markdown note stem for a touched file path."""
+    return f"file-{slugify_note_name(path).replace('.', '_')}"
+
+
+def export_obsidian_graph_artifacts(sessions: list, export_dir: Path, date_label: str, min_files: int) -> dict:
+    """Export native Obsidian graph artifacts as markdown notes linked by wikilinks."""
+    selected, _ = select_graph_sessions(sessions, min_files)
+    export_dir.mkdir(parents=True, exist_ok=True)
+    for stale in export_dir.glob("*.md"):
+        stale.unlink()
+
+    file_to_sessions = defaultdict(list)
+    session_note_names = {}
+    file_note_names = {}
+
+    for session in selected:
+        sid = slugify_note_name(session['session_id'])
+        session_note_names[session['session_id']] = f"session-{sid}"
+        for path in session['clean_files']:
+            file_note_names[path] = file_note_stem(path)
+            file_to_sessions[path].append(session['session_id'])
+
+    for session in selected:
+        note_stem = session_note_names[session['session_id']]
+        note_path = export_dir / f"{note_stem}.md"
+        title = session['title'].replace('"', '\\"')
+        lines = [
+            "---",
+            "type: session-graph-session",
+            f"session_id: {session['session_id']}",
+            f'date: {session["start_time"].strftime("%Y-%m-%d")}',
+            f'time: {session["start_time"].strftime("%H:%M")}',
+            f'title: "{title}"',
+            f"messages: {session['msg_count']}",
+            f"files: {len(session['clean_files'])}",
+            "---",
+            "",
+            f"# {session['title']}",
+            "",
+            f"- Date: {session['start_time'].strftime('%Y-%m-%d %H:%M')}",
+            f"- Messages: {session['msg_count']}",
+            f"- Source file: `{session['filepath']}`",
+            "",
+            "## Files",
+            "",
+        ]
+        for path in session['clean_files']:
+            note = file_note_names[path]
+            label = path.split('/')[-1]
+            lines.append(f"- [[{note}|{label}]]")
+        lines.append("")
+        note_path.write_text("\n".join(lines), encoding="utf-8")
+
+    for path, session_ids in sorted(file_to_sessions.items()):
+        note_stem = file_note_names[path]
+        note_path = export_dir / f"{note_stem}.md"
+        lines = [
+            "---",
+            "type: session-graph-file",
+            f'path: "{path}"',
+            f"session_count: {len(session_ids)}",
+            "---",
+            "",
+            f"# {path.split('/')[-1]}",
+            "",
+            f"- Path: `{path}`",
+            f"- Referenced by: {len(session_ids)} sessions",
+            "",
+            "## Sessions",
+            "",
+        ]
+        for session_id in sorted(session_ids):
+            session_note = session_note_names[session_id]
+            lines.append(f"- [[{session_note}]]")
+        lines.append("")
+        note_path.write_text("\n".join(lines), encoding="utf-8")
+
+    index_path = export_dir / "session-graph-index.md"
+    index_lines = [
+        "---",
+        "type: session-graph-index",
+        f'date_range: "{date_label}"',
+        f"sessions: {len(selected)}",
+        f"files: {len(file_to_sessions)}",
+        "---",
+        "",
+        f"# Session Graph Index",
+        "",
+        f"- Date range: {date_label}",
+        f"- Sessions: {len(selected)}",
+        f"- Files: {len(file_to_sessions)}",
+        "",
+        "## Sessions",
+        "",
+    ]
+    for session in selected:
+        note = session_note_names[session['session_id']]
+        index_lines.append(f"- [[{note}|{session['title']}]]")
+    index_lines.append("")
+    index_path.write_text("\n".join(index_lines), encoding="utf-8")
+
+    return {
+        "sessions": len(selected),
+        "files": len(file_to_sessions),
+        "index_path": index_path,
+    }
+
+
 def main():
     import argparse
 
@@ -1250,6 +1389,7 @@ def main():
     parser.add_argument('--all-projects', action='store_true')
     parser.add_argument('--no-open', action='store_true', help='Do not open browser')
     parser.add_argument('-o', '--output', default=None)
+    parser.add_argument('--obsidian-export', default=None, help='Directory to export native Obsidian markdown graph notes')
 
     args = parser.parse_args()
     date_expr = ' '.join(args.date_expr)
@@ -1313,6 +1453,18 @@ def main():
         'time': s['start_time'].strftime('%H:%M'),
         'msgs': s['msg_count'],
     } for s in sessions}
+
+    if args.obsidian_export:
+        export_info = export_obsidian_graph_artifacts(
+            sessions,
+            Path(args.obsidian_export),
+            date_label,
+            min_files=args.min_files,
+        )
+        print(
+            f"Obsidian export: {export_info['sessions']} session notes, "
+            f"{export_info['files']} file notes -> {export_info['index_path']}"
+        )
 
     G = build_graph(sessions, min_files=args.min_files)
     print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
