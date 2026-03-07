@@ -1,10 +1,12 @@
 # Personal OS Skills
 
-Claude Code skills for Obsidian workflows.
+Claude Code skills for Obsidian workflows, with initial Codex support for session-based memory tools.
 
 > **Claude Code x Obsidian Lab** - 6 weeks, 12 live sessions. [lab.artemzhutov.com](https://lab.artemzhutov.com/)
 
 ## Installation
+
+### Claude Code
 
 1. Add marketplace (run in Claude Code):
    ```
@@ -15,6 +17,21 @@ Claude Code skills for Obsidian workflows.
 4. Select **Install for you (user scope)**
 5. Restart Claude Code
 
+### Codex
+
+Use Codex's built-in skill installer with the skill path you want from this repo.
+
+Example:
+
+```bash
+python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
+  --repo ArtemXTech/personal-os-skills \
+  --path skills/recall \
+  --path skills/sync-claude-sessions
+```
+
+Restart Codex after installation.
+
 ## Available Skills
 
 | Skill | Description | Resources |
@@ -23,8 +40,8 @@ Claude Code skills for Obsidian workflows.
 | [wispr-flow](skills/wispr-flow/) | Analyze voice dictation data from Wispr Flow | Stats, search, export, dashboard |
 | [tasknotes](docs/tasknotes/) | Manage Obsidian tasks via TaskNotes API | [Video](https://youtu.be/ePFAVGcPh7U) · [Blog](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-(TaskNotes-+-Claude-Code)) |
 | [notebooklm](skills/notebooklm/) | Import NotebookLM notebooks into Obsidian as linked knowledge graphs | [Video](https://youtu.be/qiOu7Ptjxng) |
-| [recall](skills/recall/) | Load context from previous sessions - temporal, topic search (QMD), graph visualization | [Video](https://youtu.be/RDoTY4_xh0s) · [Setup](docs/memory-skills-setup.md) |
-| [sync-claude-sessions](skills/sync-claude-sessions/) | Export Claude Code conversations to Obsidian markdown with auto-sync hooks | [Setup](docs/memory-skills-setup.md) |
+| [recall](skills/recall/) | Load context from previous sessions - Claude Code and Codex temporal recall, plus topic search (QMD) and graph visualization | [Video](https://youtu.be/RDoTY4_xh0s) · [Setup](docs/memory-skills-setup.md) |
+| [sync-claude-sessions](skills/sync-claude-sessions/) | Export Claude Code or Codex conversations to Obsidian markdown with sync/resume helpers | [Setup](docs/memory-skills-setup.md) |
 
 ## Links
 

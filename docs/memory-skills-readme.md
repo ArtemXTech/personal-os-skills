@@ -2,6 +2,8 @@
 
 Give Claude Code persistent memory across sessions using Obsidian + QMD local search.
 
+Initial Codex support is available for the session-based scripts behind `/recall` and `/sync-claude-sessions`. The hook/setup examples below are still Claude-oriented.
+
 Two skills:
 
 **`/recall`** - Load context from previous sessions. Three modes:
@@ -9,7 +11,7 @@ Two skills:
 - Topic: "recall authentication work" (BM25 search via QMD)
 - Graph: "recall graph last week" (interactive session visualization)
 
-**`/sync-claude-sessions`** - Export Claude Code conversations to Obsidian markdown. Auto-sync via hooks, add notes, resume sessions.
+**`/sync-claude-sessions`** - Export Claude Code or Codex conversations to Obsidian markdown. Auto-sync via hooks, add notes, resume sessions.
 
 ## Quick Start
 
@@ -35,7 +37,7 @@ Two skills:
    /recall graph last week
    ```
 
-Temporal recall works immediately - it reads native Claude Code session files. Topic search requires QMD collections (see AGENTS.md for full setup).
+Temporal recall works immediately - it reads native Claude Code or Codex session files. Topic search requires QMD collections (see AGENTS.md for full setup).
 
 ## Full Setup
 

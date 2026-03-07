@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync Claude Code sessions to Obsidian markdown.
+"""Sync Claude Code or Codex sessions to Obsidian markdown.
 
 Usage:
     claude-sessions sync [--session-id ID] [--transcript PATH]
@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 __version__ = "1.0.0"
+CLAUDE_BACKEND = "claude"
+CODEX_BACKEND = "codex"
 
 # Configuration - auto-detect from environment or CWD
 def _detect_vault_dir():
@@ -33,7 +35,7 @@ def _detect_vault_dir():
             return parent
     return cwd
 
-def _detect_sessions_dir():
+def _detect_claude_sessions_dir():
     """Auto-detect Claude project sessions directory from CWD."""
     cwd = str(Path.cwd())
     encoded = cwd.replace("/", "-")
@@ -48,10 +50,38 @@ def _detect_sessions_dir():
             return dirs[0]
     return projects
 
+
+def _detect_codex_sessions_dir():
+    """Codex stores rollouts under ~/.codex/sessions/YYYY/MM/DD."""
+    return Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
+
+
+def _detect_session_backend():
+    """Prefer an explicit override, then Claude project-local logs, then Codex rollouts."""
+    override = os.environ.get("SESSION_BACKEND", "").strip().lower()
+    if override in {CLAUDE_BACKEND, CODEX_BACKEND}:
+        return override
+
+    claude_dir = _detect_claude_sessions_dir()
+    if claude_dir.is_dir() and list(claude_dir.glob("*.jsonl")):
+        return CLAUDE_BACKEND
+
+    codex_dir = _detect_codex_sessions_dir()
+    if codex_dir.is_dir():
+        return CODEX_BACKEND
+
+    return CLAUDE_BACKEND
+
 VAULT_DIR = _detect_vault_dir()
 OUTPUT_DIR = VAULT_DIR / "Claude-Sessions"
-SKILLS_DIR = VAULT_DIR / ".claude" / "skills"
-SESSIONS_DIR = _detect_sessions_dir()
+CLAUDE_SKILLS_DIR = VAULT_DIR / ".claude" / "skills"
+CODEX_SKILLS_DIR = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "skills"
+SESSION_BACKEND = _detect_session_backend()
+SESSIONS_DIR = (
+    _detect_claude_sessions_dir()
+    if SESSION_BACKEND == CLAUDE_BACKEND
+    else _detect_codex_sessions_dir()
+)
 
 PRESERVED_FIELDS = {"comments", "projects", "status", "tags", "rating", "title"}
 PRESERVED_SECTION = "## My Notes"
@@ -79,10 +109,38 @@ def parse_jsonl(file_path: Path) -> list[dict]:
 
 def get_skill_relative_path(skill_name: str) -> str | None:
     """Get relative path from Claude-Sessions folder to skill SKILL.md."""
-    skill_file = SKILLS_DIR / skill_name / "SKILL.md"
+    skill_file = CLAUDE_SKILLS_DIR / skill_name / "SKILL.md"
     if skill_file.exists():
         return f"../.claude/skills/{skill_name}/SKILL.md"
+    skill_file = CODEX_SKILLS_DIR / skill_name / "SKILL.md"
+    if skill_file.exists():
+        return None
     return None
+
+
+def iter_session_paths():
+    """Yield raw transcript paths for the active backend."""
+    if SESSION_BACKEND == CLAUDE_BACKEND:
+        yield from SESSIONS_DIR.glob("*.jsonl")
+        return
+    yield from SESSIONS_DIR.rglob("*.jsonl")
+
+
+def resolve_session_path(session_id: str) -> Path | None:
+    """Resolve a session file from an id for either Claude or Codex storage."""
+    if SESSION_BACKEND == CLAUDE_BACKEND:
+        path = SESSIONS_DIR / f"{session_id}.jsonl"
+        return path if path.exists() else None
+
+    target = session_id.lower()
+    exact = None
+    for path in iter_session_paths():
+        name = path.name.lower()
+        if target in name:
+            if name.endswith(f"{target}.jsonl"):
+                return path
+            exact = exact or path
+    return exact
 
 
 def path_to_wikilink(file_path: str) -> str | None:
@@ -118,9 +176,21 @@ def extract_file_operations(records: list[dict]) -> dict:
     return {"created": files_created, "modified": list(files_modified)}
 
 
-def extract_session_data(records: list[dict]) -> dict:
-    """Extract session metadata from records."""
+def extract_codex_user_text(payload: dict) -> list[str]:
+    """Extract user-entered text blocks from a Codex message payload."""
+    texts = []
+    for item in payload.get("content", []):
+        if isinstance(item, dict) and item.get("type") == "input_text":
+            text = item.get("text", "").strip()
+            if text:
+                texts.append(text)
+    return texts
+
+
+def extract_session_data_claude(records: list[dict]) -> dict:
+    """Extract session metadata from Claude records."""
     data = {
+        "backend": CLAUDE_BACKEND,
         "session_id": None,
         "date": None,
         "title": None,
@@ -194,8 +264,74 @@ def extract_session_data(records: list[dict]) -> dict:
     file_ops = extract_file_operations(records)
     data["files_created"] = file_ops["created"]
     data["files_modified"] = file_ops["modified"]
+    return data
+
+
+def extract_session_data_codex(records: list[dict]) -> dict:
+    """Extract session metadata from Codex rollout lines."""
+    data = {
+        "backend": CODEX_BACKEND,
+        "session_id": None,
+        "date": None,
+        "title": None,
+        "summary": None,
+        "skills": [],
+        "messages": 0,
+        "user_messages": [],
+        "first_timestamp": None,
+        "last_timestamp": None,
+        "files_created": [],
+        "files_modified": [],
+    }
+
+    for record in records:
+        timestamp = record.get("timestamp", "")
+        if record.get("type") == "session_meta":
+            payload = record.get("payload", {})
+            data["session_id"] = data["session_id"] or payload.get("id")
+            created_at = payload.get("timestamp") or timestamp
+            if created_at:
+                data["date"] = data["date"] or created_at.split("T")[0]
+                data["first_timestamp"] = data["first_timestamp"] or created_at
+                data["last_timestamp"] = created_at
+            continue
+
+        if record.get("type") != "response_item":
+            continue
+
+        payload = record.get("payload", {})
+        if payload.get("type") != "message":
+            continue
+
+        role = payload.get("role")
+        if timestamp:
+            if not data["first_timestamp"]:
+                data["first_timestamp"] = timestamp
+            data["last_timestamp"] = timestamp
+            if not data["date"]:
+                data["date"] = timestamp.split("T")[0]
+
+        if role == "user":
+            texts = extract_codex_user_text(payload)
+            if texts:
+                data["messages"] += 1
+                data["user_messages"].extend(texts)
+
+    if not data["title"] and data["user_messages"]:
+        first_msg = data["user_messages"][0]
+        data["title"] = first_msg.replace("\n", " ").strip()[:80]
+
+    if not data["date"]:
+        data["date"] = datetime.now().strftime("%Y-%m-%d")
 
     return data
+
+
+def extract_session_data(records: list[dict]) -> dict:
+    """Extract session metadata from records for Claude or Codex."""
+    if records and records[0].get("type") == "session_meta":
+        return extract_session_data_codex(records)
+    return extract_session_data_claude(records)
 
 
 # =============================================================================
@@ -280,6 +416,7 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     # Frontmatter
     lines.append("---")
     lines.append("type: claude-session")
+    lines.append(f"agent_backend: {data.get('backend', SESSION_BACKEND)}")
     lines.append(f"date: {data['date']}")
     lines.append(f"session_id: {session_id}")
 
@@ -432,9 +569,9 @@ def sync_session(session_id: str, transcript_path: str | None = None, quiet: boo
     if transcript_path:
         jsonl_path = Path(transcript_path)
     else:
-        jsonl_path = SESSIONS_DIR / f"{session_id}.jsonl"
+        jsonl_path = resolve_session_path(session_id)
 
-    if not jsonl_path.exists() or jsonl_path.stat().st_size == 0:
+    if not jsonl_path or not jsonl_path.exists() or jsonl_path.stat().st_size == 0:
         return None
 
     records = parse_jsonl(jsonl_path)
@@ -571,7 +708,7 @@ def get_session_files() -> list[tuple[Path, dict]]:
         try:
             content = f.read_text(encoding="utf-8")
             fm = parse_frontmatter(content)
-            if fm.get("type") == "claude-session":
+            if fm.get("type") in {"claude-session", "agent-session"}:
                 sessions.append((f, fm))
         except Exception:
             continue
@@ -668,24 +805,30 @@ def cmd_export(args):
     """Export command - batch export sessions."""
     if args.today:
         cutoff = time.time() - 86400
-        sessions = [f for f in SESSIONS_DIR.glob("*.jsonl")
+        sessions = [f for f in iter_session_paths()
                     if f.stat().st_mtime >= cutoff and f.stat().st_size > 0]
         print(f"Found {len(sessions)} sessions from today")
     elif args.all:
-        sessions = [f for f in SESSIONS_DIR.glob("*.jsonl") if f.stat().st_size > 0]
+        sessions = [f for f in iter_session_paths() if f.stat().st_size > 0]
         print(f"Found {len(sessions)} total sessions")
     else:
         sessions = [Path(args.file)]
 
     for session_file in sessions:
         session_id = session_file.stem
+        if SESSION_BACKEND == CODEX_BACKEND:
+            records = parse_jsonl(session_file)
+            session_id = (
+                extract_session_data(records).get("session_id")
+                or session_file.stem
+            )
         sync_session(session_id, str(session_file), quiet=args.quiet)
 
     return 0
 
 
 def cmd_resume(args):
-    """Resume command - resume a session in Claude Code."""
+    """Resume command - resume a session in Claude Code or Codex."""
     target_file = None
 
     if args.file:
@@ -718,17 +861,25 @@ def cmd_resume(args):
         print(f"Error: No session_id in {target_file}", file=sys.stderr)
         return 1
 
-    cmd = ["claude", "--resume", session_id]
-    if args.fork:
-        cmd.append("--fork-session")
+    backend = fm.get("agent_backend", SESSION_BACKEND)
+    if backend == CODEX_BACKEND:
+        cmd = ["codex", "fork" if args.fork else "resume", session_id]
+    else:
+        cmd = ["claude", "--resume", session_id]
+        if args.fork:
+            cmd.append("--fork-session")
 
     print(f"Resuming: {session_id}")
-    os.execvp("claude", cmd)
+    os.execvp(cmd[0], cmd)
 
 
 def cmd_note(args):
     """Note command - add timestamped note to session."""
-    session_id = args.session_id or os.environ.get("CLAUDE_SESSION_ID")
+    session_id = (
+        args.session_id
+        or os.environ.get("CLAUDE_SESSION_ID")
+        or os.environ.get("CODEX_SESSION_ID")
+    )
 
     if not session_id:
         # Try current session from most recent active
@@ -751,7 +902,11 @@ def cmd_note(args):
 
 def cmd_close(args):
     """Close command - mark session done with optional note."""
-    session_id = args.session_id or os.environ.get("CLAUDE_SESSION_ID")
+    session_id = (
+        args.session_id
+        or os.environ.get("CLAUDE_SESSION_ID")
+        or os.environ.get("CODEX_SESSION_ID")
+    )
 
     if not session_id:
         active = get_active_sessions()
@@ -776,7 +931,11 @@ def cmd_close(args):
 
 def cmd_log(args):
     """Log command - annotate session with status, tags, rating, and comment."""
-    session_id = args.session_id or os.environ.get("CLAUDE_SESSION_ID")
+    session_id = (
+        args.session_id
+        or os.environ.get("CLAUDE_SESSION_ID")
+        or os.environ.get("CODEX_SESSION_ID")
+    )
 
     if not session_id:
         active = get_active_sessions()
@@ -842,7 +1001,7 @@ def cmd_list(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="claude-sessions",
-        description="Sync Claude Code sessions to Obsidian markdown",
+        description="Sync Claude Code or Codex sessions to Obsidian markdown",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-q", "--quiet", action="store_true", help="Suppress output")

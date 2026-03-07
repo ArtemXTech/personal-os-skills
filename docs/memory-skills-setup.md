@@ -2,6 +2,8 @@
 
 Agent-readable setup guide. Follow these steps to give Claude Code persistent memory across sessions using QMD local search and Obsidian.
 
+Codex note: the session parsing scripts now understand Codex rollouts in `~/.codex/sessions`, but the install paths and hook examples in this document are still written for Claude Code.
+
 ## Prerequisites
 
 - Claude Code installed and working
