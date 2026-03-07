@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 ROOT = Path("/home/tools/personal-os-skills")
+WRAPPER_SCRIPT = ROOT / "scripts" / "codex-memory"
 SYNC_SCRIPT = ROOT / "skills" / "sync-claude-sessions" / "scripts" / "claude-sessions"
 RECALL_DAY_SCRIPT = ROOT / "skills" / "recall" / "scripts" / "recall-day.py"
 EXTRACT_SCRIPT = ROOT / "skills" / "recall" / "scripts" / "extract-sessions.py"
@@ -214,6 +215,18 @@ class CodexSessionSupportTests(unittest.TestCase):
 
             file_note = (export_dir / "file-tools__demo__README_md.md").read_text(encoding="utf-8")
             self.assertIn("[[session-sess-5]]", file_note)
+
+    def test_session_graph_default_obsidian_export_dir_uses_vault(self):
+        os.environ["VAULT_DIR"] = "/tmp/example-vault"
+        graph_mod = load_module(GRAPH_SCRIPT, "session_graph_default_export_test")
+        expected = Path("/tmp/example-vault/Session-Graphs/last-week")
+        self.assertEqual(graph_mod.default_obsidian_export_dir("Last Week"), expected)
+
+    def test_codex_memory_wrapper_sets_backend_and_dispatches(self):
+        content = WRAPPER_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('os.environ.setdefault("SESSION_BACKEND", "codex")', content)
+        self.assertIn('"session-graph"', content)
+        self.assertIn('"sync-sessions"', content)
 
 
 if __name__ == "__main__":

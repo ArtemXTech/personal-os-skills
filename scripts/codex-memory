@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Codex-first wrapper for the session memory scripts in this repo.
+
+Usage:
+    codex-memory recall-day ...
+    codex-memory extract-sessions ...
+    codex-memory session-graph ...
+    codex-memory sync-sessions ...
+"""
+
+import os
+import sys
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_MAP = {
+    "recall-day": REPO_ROOT / "skills" / "recall" / "scripts" / "recall-day.py",
+    "extract-sessions": REPO_ROOT / "skills" / "recall" / "scripts" / "extract-sessions.py",
+    "session-graph": REPO_ROOT / "skills" / "recall" / "scripts" / "session-graph.py",
+    "sync-sessions": REPO_ROOT / "skills" / "sync-claude-sessions" / "scripts" / "claude-sessions",
+}
+
+
+def main() -> int:
+    if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help"}:
+        print(__doc__.strip())
+        print("\nCommands:")
+        for name in SCRIPT_MAP:
+            print(f"  {name}")
+        return 0
+
+    command = sys.argv[1]
+    script = SCRIPT_MAP.get(command)
+    if script is None:
+        print(f"Unknown command: {command}", file=sys.stderr)
+        return 2
+
+    os.environ.setdefault("SESSION_BACKEND", "codex")
+    os.execvp("python3", ["python3", str(script), *sys.argv[2:]])
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -40,7 +40,19 @@ def _detect_vault_prefix():
     # Fallback: use CWD
     return str(cwd) + "/"
 
+
+def _detect_vault_dir() -> Path | None:
+    """Detect the actual Obsidian vault root, if available."""
+    if os.environ.get("VAULT_DIR"):
+        return Path(os.environ["VAULT_DIR"])
+    cwd = Path.cwd()
+    for parent in [cwd, *cwd.parents]:
+        if (parent / ".obsidian").is_dir():
+            return parent
+    return None
+
 VAULT_PREFIX = _detect_vault_prefix()
+VAULT_DIR = _detect_vault_dir()
 HOME_PREFIX = str(Path.home()) + "/"
 SKIP_PREFIXES = ["/tmp/", "/private/tmp/", "/dev/", "/var/", "/usr/"]
 SKIP_PATTERNS = [
@@ -1269,6 +1281,13 @@ def slugify_note_name(value: str) -> str:
     return value or "item"
 
 
+def default_obsidian_export_dir(date_label: str) -> Path | None:
+    """Pick a vault-oriented default export directory when an Obsidian vault is known."""
+    if VAULT_DIR is None:
+        return None
+    return VAULT_DIR / "Session-Graphs" / slugify_note_name(date_label.lower())
+
+
 def file_note_stem(path: str) -> str:
     """Build a stable markdown note stem for a touched file path."""
     return f"file-{slugify_note_name(path).replace('.', '_')}"
@@ -1454,10 +1473,16 @@ def main():
         'msgs': s['msg_count'],
     } for s in sessions}
 
-    if args.obsidian_export:
+    obsidian_export_dir = (
+        Path(args.obsidian_export)
+        if args.obsidian_export
+        else default_obsidian_export_dir(date_label)
+    )
+
+    if obsidian_export_dir:
         export_info = export_obsidian_graph_artifacts(
             sessions,
-            Path(args.obsidian_export),
+            obsidian_export_dir,
             date_label,
             min_files=args.min_files,
         )

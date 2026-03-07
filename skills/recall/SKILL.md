@@ -44,8 +44,7 @@ Graph options: `--min-files 5` for cleaner graphs (only sessions touching 5+ fil
 
 Example:
 ```bash
-uv run python ~/.codex/skills/recall/scripts/session-graph.py last week \
-  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+uv run python /path/to/personal-os-skills/scripts/codex-memory session-graph last week
 ```
 
 ## Workflow

@@ -54,6 +54,13 @@ uv run python skills/recall/scripts/session-graph.py last week \
 
 This creates session notes, file notes, and an index note connected with wikilinks so Obsidian's graph view can render them directly.
 
+If you are using Codex, you can also use the helper wrapper instead of repeating `SESSION_BACKEND=codex`:
+
+```bash
+uv run python scripts/codex-memory recall-day last week --min-msgs 1
+uv run python scripts/codex-memory session-graph last week
+```
+
 ## Tests
 
 Run the session-backend regression tests with:

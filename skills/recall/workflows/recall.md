@@ -25,6 +25,12 @@ python3 .claude/skills/recall/scripts/recall-day.py list DATE_EXPR
 
 If installed in Codex instead of Claude Code, run the same script from `~/.codex/skills/recall/scripts/recall-day.py` or set `SESSION_BACKEND=codex` explicitly when needed.
 
+From the repo checkout, you can also use:
+
+```bash
+uv run python scripts/codex-memory recall-day list DATE_EXPR
+```
+
 Replace `DATE_EXPR` with the parsed date expression. Supported:
 - `yesterday`, `today`
 - `YYYY-MM-DD`
@@ -145,6 +151,12 @@ python3 .claude/skills/recall/scripts/session-graph.py DATE_EXPR
 
 Codex installs can run the equivalent script from `~/.codex/skills/recall/scripts/session-graph.py`. The graph script now understands both Claude project logs and Codex rollouts.
 
+From the repo checkout, you can also use:
+
+```bash
+uv run python scripts/codex-memory session-graph DATE_EXPR
+```
+
 Options:
 - `--min-files N` - only show sessions touching N+ files (default: 2, use 5+ for cleaner graphs)
 - `--min-msgs N` - filter noise (default: 3)
@@ -162,6 +174,12 @@ When `--obsidian-export DIR` is set, also generate:
 - an index note
 
 These are linked with wikilinks so Obsidian's graph view can render the session/file network natively.
+
+If `--obsidian-export` is omitted and `VAULT_DIR` is set (or the current working directory is inside an Obsidian vault), the export defaults to:
+
+```text
+<vault>/Session-Graphs/<date-range-slug>/
+```
 
 ## Notes
 

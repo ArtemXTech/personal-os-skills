@@ -47,6 +47,14 @@ Run scripts with `uv run`, for example:
 uv run python skills/recall/scripts/session-graph.py today --min-msgs 1 --min-files 1
 ```
 
+For Codex-specific memory workflows, use the helper wrapper:
+
+```bash
+uv run python scripts/codex-memory recall-day today --min-msgs 1
+uv run python scripts/codex-memory sync-sessions export --all
+uv run python scripts/codex-memory session-graph last week
+```
+
 ## Available Skills
 
 | Skill | Description | Resources |

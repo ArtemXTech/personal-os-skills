@@ -13,9 +13,9 @@ uv sync
 Codex workflow from the repo checkout:
 
 ```bash
-SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions export --all
-SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions list --all
-SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions resume --pick
+uv run python scripts/codex-memory sync-sessions export --all
+uv run python scripts/codex-memory sync-sessions list --all
+uv run python scripts/codex-memory sync-sessions resume --pick
 ```
 
 ## 1. Add Hooks to Settings

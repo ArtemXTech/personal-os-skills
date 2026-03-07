@@ -20,6 +20,12 @@ cd /path/to/personal-os-skills
 uv sync
 ```
 
+Optional Codex helper wrapper from the repo checkout:
+
+```bash
+uv run python scripts/codex-memory --help
+```
+
 ## Prerequisites
 
 - Claude Code installed and working
@@ -169,7 +175,7 @@ alias cs="python3 .claude/skills/sync-claude-sessions/scripts/claude-sessions"
 Codex-friendly alias from the repo checkout:
 
 ```bash
-alias cs="SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions"
+alias cs="uv run python scripts/codex-memory sync-sessions"
 ```
 
 ## Step 8: Codex Workflow
@@ -178,16 +184,16 @@ Typical Codex workflow from the repo checkout:
 
 ```bash
 # Export saved Codex sessions into Obsidian markdown
-SESSION_BACKEND=codex uv run python skills/sync-claude-sessions/scripts/claude-sessions export --all
+uv run python scripts/codex-memory sync-sessions export --all
 
 # Recall recent Codex sessions by date
-SESSION_BACKEND=codex uv run python skills/recall/scripts/recall-day.py list last week --min-msgs 1
+uv run python scripts/codex-memory recall-day list last week --min-msgs 1
 
-# Build the interactive HTML graph plus native Obsidian graph notes
-SESSION_BACKEND=codex uv run python skills/recall/scripts/session-graph.py last week \
+# Build the interactive HTML graph plus native Obsidian graph notes.
+# If VAULT_DIR is set (or CWD is inside a vault), the Obsidian export path is chosen automatically.
+uv run python scripts/codex-memory session-graph last week \
   --min-msgs 1 \
-  --min-files 1 \
-  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+  --min-files 1
 ```
 
 When you export a Codex session note, `cs resume` will resume it with `codex resume`, and `cs resume --fork` will use `codex fork`.
@@ -222,7 +228,7 @@ Interactive HTML visualization of sessions and files touched. Requires networkx 
 Native Obsidian graph export:
 
 ```bash
-uv run python skills/recall/scripts/session-graph.py last week \
+uv run python scripts/codex-memory session-graph last week \
   --obsidian-export /path/to/your/vault/Session-Graphs/last-week
 ```
 
