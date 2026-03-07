@@ -9,7 +9,7 @@ Two skills:
 **`/recall`** - Load context from previous sessions. Three modes:
 - Temporal: "what did I work on yesterday?" (scans native JSONL logs)
 - Topic: "recall authentication work" (BM25 search via QMD)
-- Graph: "recall graph last week" (interactive session visualization)
+- Graph: "recall graph last week" (interactive session visualization for Claude Code or Codex rollouts)
 
 **`/sync-claude-sessions`** - Export Claude Code or Codex conversations to Obsidian markdown. Auto-sync via hooks, add notes, resume sessions.
 
@@ -42,6 +42,14 @@ Temporal recall works immediately - it reads native Claude Code or Codex session
 ## Full Setup
 
 See [AGENTS.md](AGENTS.md) for complete setup instructions including QMD collections, auto-sync hooks, and auto-indexing.
+
+## Tests
+
+Run the session-backend regression tests with:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
 
 ## Video
 

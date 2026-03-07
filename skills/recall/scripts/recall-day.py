@@ -90,6 +90,52 @@ def extract_codex_user_text(payload: dict) -> str:
     return '\n'.join(parts)
 
 
+def iter_session_jsonl_files(proj_dir: Path):
+    """Iterate session files for the active backend."""
+    return proj_dir.rglob("*.jsonl") if SESSION_BACKEND == CODEX_BACKEND else proj_dir.glob("*.jsonl")
+
+
+def dedupe_session_metadata(items: list[dict]) -> list[dict]:
+    """Keep only the latest metadata row for each session id."""
+    latest: dict[str, dict] = {}
+    for item in items:
+        sid = item['session_id']
+        current = latest.get(sid)
+        if current is None or item['start_time'] > current['start_time']:
+            latest[sid] = item
+    return sorted(latest.values(), key=lambda s: s['start_time'])
+
+
+def find_latest_matching_session_file(project_dirs: list[Path], target_id: str) -> Path | None:
+    """Find the newest file matching a session id or rollout stem."""
+    matches = []
+    for proj_dir in project_dirs:
+        for filepath in iter_session_jsonl_files(proj_dir):
+            stem = filepath.stem.lower()
+            if stem.startswith(target_id) or target_id in stem:
+                matches.append(filepath)
+                continue
+
+            try:
+                with open(filepath, encoding='utf-8') as f:
+                    for line in f:
+                        obj = json.loads(line)
+                        if obj.get('type') == 'session_meta':
+                            sid = (obj.get('payload', {}).get('id') or '').lower()
+                            if sid.startswith(target_id):
+                                matches.append(filepath)
+                            break
+                        if obj.get('sessionId') and str(obj['sessionId']).lower().startswith(target_id):
+                            matches.append(filepath)
+                            break
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+
+    if not matches:
+        return None
+    return max(matches, key=lambda p: p.stat().st_mtime)
+
+
 def parse_date_expr(expr: str) -> tuple[datetime, datetime]:
     """Parse a date expression into (start, end) date range (UTC, day boundaries).
 
@@ -308,11 +354,7 @@ def cmd_list(args):
     total_scanned = 0
 
     for proj_dir in project_dirs:
-        jsonl_files = (
-            list(proj_dir.rglob("*.jsonl"))
-            if SESSION_BACKEND == CODEX_BACKEND
-            else list(proj_dir.glob("*.jsonl"))
-        )
+        jsonl_files = list(iter_session_jsonl_files(proj_dir))
         total_scanned += len(jsonl_files)
 
         for filepath in jsonl_files:
@@ -334,7 +376,7 @@ def cmd_list(args):
 
             sessions.append(meta)
 
-    sessions.sort(key=lambda s: s['start_time'])
+    sessions = dedupe_session_metadata(sessions)
 
     # Format date range for header
     if date_end - date_start <= timedelta(days=1):
@@ -378,19 +420,7 @@ def cmd_expand(args):
     target_id = args.session_id.lower()
 
     # Find the JSONL file
-    target_file = None
-    for proj_dir in project_dirs:
-        jsonl_files = (
-            proj_dir.rglob("*.jsonl")
-            if SESSION_BACKEND == CODEX_BACKEND
-            else proj_dir.glob("*.jsonl")
-        )
-        for filepath in jsonl_files:
-            if filepath.stem.lower().startswith(target_id) or target_id in filepath.stem.lower():
-                target_file = filepath
-                break
-        if target_file:
-            break
+    target_file = find_latest_matching_session_file(project_dirs, target_id)
 
     if not target_file:
         print(f"Error: No session found matching '{args.session_id}'", file=sys.stderr)

@@ -2,6 +2,8 @@
 
 Enable automatic syncing of Claude Code sessions to Obsidian.
 
+Codex note: the export/resume script supports Codex rollouts, but the live hook examples below are still Claude-specific.
+
 ## 1. Add Hooks to Settings
 
 Edit `~/.claude/settings.json`:
@@ -49,6 +51,8 @@ Then:
 - `cs note "got it working"` - add note
 - `cs close "done"` - mark done
 - `cs resume --pick` - resume session
+
+For Codex-exported notes, `cs resume` will call `codex resume` / `codex fork` automatically based on the note frontmatter.
 
 ## 3. Verify
 

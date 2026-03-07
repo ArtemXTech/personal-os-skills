@@ -77,6 +77,21 @@ DEFAULT_OUTPUT = _detect_default_output()
 DEFAULT_DAYS = 21
 SESSION_BACKEND = _detect_backend()
 
+
+def get_rollout_session_id(filepath: str) -> str:
+    """Read the canonical session/thread id from a Claude or Codex JSONL file."""
+    try:
+        with open(filepath, encoding="utf-8") as f:
+            for line in f:
+                obj = json.loads(line)
+                if obj.get('type') == 'session_meta':
+                    return obj.get('payload', {}).get('id') or Path(filepath).stem
+                if obj.get('sessionId'):
+                    return obj['sessionId']
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    return Path(filepath).stem
+
 # Patterns to strip from user messages
 STRIP_PATTERNS = [
     r'<system-reminder>.*?</system-reminder>',
@@ -253,6 +268,13 @@ def main():
     if SESSION_BACKEND == CODEX_BACKEND:
         pattern = os.path.join(args.source, "**", "*.jsonl")
         all_files = glob.glob(pattern, recursive=True)
+        latest_by_id = {}
+        for f in all_files:
+            sid = get_rollout_session_id(f)
+            current = latest_by_id.get(sid)
+            if current is None or os.path.getmtime(f) > os.path.getmtime(current):
+                latest_by_id[sid] = f
+        all_files = list(latest_by_id.values())
     else:
         pattern = os.path.join(args.source, "*.jsonl")
         all_files = glob.glob(pattern)

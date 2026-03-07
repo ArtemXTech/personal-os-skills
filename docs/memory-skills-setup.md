@@ -4,6 +4,15 @@ Agent-readable setup guide. Follow these steps to give Claude Code persistent me
 
 Codex note: the session parsing scripts now understand Codex rollouts in `~/.codex/sessions`, but the install paths and hook examples in this document are still written for Claude Code.
 
+If you want to install the skills in Codex instead of Claude Code, use Codex's skill installer:
+
+```bash
+python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
+  --repo ArtemXTech/personal-os-skills \
+  --path skills/recall \
+  --path skills/sync-claude-sessions
+```
+
 ## Prerequisites
 
 - Claude Code installed and working

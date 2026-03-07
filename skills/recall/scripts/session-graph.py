@@ -21,9 +21,6 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import networkx as nx
-from pyvis.network import Network
-
 # Import recall-day as module
 import importlib.util
 spec = importlib.util.spec_from_file_location("recall_day", Path(__file__).parent / "recall-day.py")
@@ -44,9 +41,11 @@ def _detect_vault_prefix():
     return str(cwd) + "/"
 
 VAULT_PREFIX = _detect_vault_prefix()
+HOME_PREFIX = str(Path.home()) + "/"
 SKIP_PREFIXES = ["/tmp/", "/private/tmp/", "/dev/", "/var/", "/usr/"]
 SKIP_PATTERNS = [
     re.compile(r'\.claude/projects/'),
+    re.compile(r'\.codex/sessions/'),
     re.compile(r'node_modules/'),
     re.compile(r'\.git/'),
     re.compile(r'__pycache__/'),
@@ -54,7 +53,11 @@ SKIP_PATTERNS = [
 ]
 
 FILE_PATH_RE = re.compile(
-    r'(?:^|[\s"\'=])(' + re.escape(VAULT_PREFIX) + r'[^\s"\';<>|&\)]+)',
+    r'(?:^|[\s"\'=])(('
+    + re.escape(VAULT_PREFIX)
+    + r'|'
+    + re.escape(HOME_PREFIX)
+    + r')[^\s"\';<>|&\)]+)',
 )
 
 # Obsidian-inspired palette
@@ -86,6 +89,9 @@ FOLDER_COLORS = {
     "Notes/Docs/": "#CBD5E1",
     "Notes/Projects/": "#A7F3D0",
     ".claude/skills/": "#A5F3FC",
+    ".codex/skills/": "#A5F3FC",
+    "tools/": "#93C5FD",
+    "strato-space/": "#7DDCB5",
     "Templates/": "#FDE68A",
     "Daily/": "#BBF7D0",
     "External/": "#E7E5E4",
@@ -100,6 +106,9 @@ FILTERABLE_FOLDERS = [
     "Notes/Sessions/",
     "Notes/Content/",
     ".claude/skills/",
+    ".codex/skills/",
+    "tools/",
+    "strato-space/",
 ]
 
 # Files that are touched by almost every session - skip them
@@ -127,62 +136,126 @@ def extract_file_paths(jsonl_path: Path) -> dict | None:
                 except json.JSONDecodeError:
                     continue
 
-                if obj.get('sessionId'):
-                    session_id = obj['sessionId']
-
-                ts_str = obj.get('timestamp')
-                if ts_str and not start_time:
-                    try:
-                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                    except (ValueError, TypeError):
-                        pass
-
-                if obj.get('type') == 'user':
-                    user_msg_count += 1
-                    if first_user_msg is None:
-                        raw = recall_day.extract_text(obj.get('message', {}).get('content', ''))
-                        cleaned = recall_day.clean_content(raw)
-                        if cleaned and len(cleaned) >= 5:
-                            first_user_msg = cleaned
-
-                if obj.get('type') != 'assistant':
-                    continue
-
-                content = obj.get('message', {}).get('content', [])
-                if not isinstance(content, list):
-                    continue
-
-                for block in content:
-                    if not isinstance(block, dict) or block.get('type') != 'tool_use':
+                if recall_day.SESSION_BACKEND == recall_day.CODEX_BACKEND:
+                    if obj.get('type') == 'session_meta':
+                        payload = obj.get('payload', {})
+                        session_id = payload.get('id', session_id)
+                        ts_str = payload.get('timestamp') or obj.get('timestamp')
+                        if ts_str and not start_time:
+                            try:
+                                start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                            except (ValueError, TypeError):
+                                pass
                         continue
 
-                    tool = block.get('name', '')
-                    inp = block.get('input', {})
+                    if obj.get('type') != 'response_item':
+                        continue
 
-                    if tool in ('Read', 'Edit', 'Write', 'NotebookEdit'):
-                        fp = inp.get('file_path') or inp.get('notebook_path', '')
-                        if fp:
-                            norm = normalize_path(fp)
-                            if norm:
-                                files.add(norm)
-                                ops[norm].add(tool.lower())
+                    payload = obj.get('payload', {})
+                    if payload.get('type') == 'message' and payload.get('role') == 'user':
+                        user_msg_count += 1
+                        if first_user_msg is None:
+                            raw = recall_day.extract_codex_user_text(payload)
+                            cleaned = recall_day.clean_content(raw)
+                            if cleaned and len(cleaned) >= 5:
+                                first_user_msg = cleaned
+                        continue
 
-                    elif tool in ('Glob', 'Grep'):
-                        fp = inp.get('path', '')
-                        if fp:
-                            norm = normalize_path(fp)
-                            if norm:
-                                files.add(norm)
-                                ops[norm].add('search')
+                    if payload.get('type') != 'function_call':
+                        continue
 
-                    elif tool == 'Bash':
-                        cmd = inp.get('command', '')
-                        for m in FILE_PATH_RE.finditer(cmd):
-                            fp = m.group(1).rstrip('.,;:')
-                            norm = normalize_path(fp)
-                            if norm:
-                                files.add(norm)
-                                ops[norm].add('bash')
+                    tool = payload.get('name', '')
+                    args_raw = payload.get('arguments', '')
+                    try:
+                        inp = json.loads(args_raw) if isinstance(args_raw, str) else {}
+                    except json.JSONDecodeError:
+                        inp = {}
+
+                    if tool == 'apply_patch' and isinstance(args_raw, str):
+                        for marker in ('*** Update File: ', '*** Add File: '):
+                            for line in args_raw.splitlines():
+                                if line.startswith(marker):
+                                    norm = normalize_path(line[len(marker):].strip())
+                                    if norm:
+                                        files.add(norm)
+                                        ops[norm].add('patch')
+
+                    candidate_paths = [
+                        inp.get('file_path'),
+                        inp.get('notebook_path'),
+                        inp.get('path'),
+                        inp.get('workdir'),
+                    ]
+                    for fp in candidate_paths:
+                        norm = normalize_path(fp)
+                        if norm:
+                            files.add(norm)
+                            ops[norm].add(tool.lower())
+
+                    cmd = inp.get('cmd') or inp.get('command') or ""
+                    for m in FILE_PATH_RE.finditer(cmd):
+                        fp = m.group(1).rstrip('.,;:')
+                        norm = normalize_path(fp)
+                        if norm:
+                            files.add(norm)
+                            ops[norm].add(tool.lower())
+                else:
+                    if obj.get('sessionId'):
+                        session_id = obj['sessionId']
+
+                    ts_str = obj.get('timestamp')
+                    if ts_str and not start_time:
+                        try:
+                            start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        except (ValueError, TypeError):
+                            pass
+
+                    if obj.get('type') == 'user':
+                        user_msg_count += 1
+                        if first_user_msg is None:
+                            raw = recall_day.extract_text(obj.get('message', {}).get('content', ''))
+                            cleaned = recall_day.clean_content(raw)
+                            if cleaned and len(cleaned) >= 5:
+                                first_user_msg = cleaned
+
+                    if obj.get('type') != 'assistant':
+                        continue
+
+                    content = obj.get('message', {}).get('content', [])
+                    if not isinstance(content, list):
+                        continue
+
+                    for block in content:
+                        if not isinstance(block, dict) or block.get('type') != 'tool_use':
+                            continue
+
+                        tool = block.get('name', '')
+                        inp = block.get('input', {})
+
+                        if tool in ('Read', 'Edit', 'Write', 'NotebookEdit'):
+                            fp = inp.get('file_path') or inp.get('notebook_path', '')
+                            if fp:
+                                norm = normalize_path(fp)
+                                if norm:
+                                    files.add(norm)
+                                    ops[norm].add(tool.lower())
+
+                        elif tool in ('Glob', 'Grep'):
+                            fp = inp.get('path', '')
+                            if fp:
+                                norm = normalize_path(fp)
+                                if norm:
+                                    files.add(norm)
+                                    ops[norm].add('search')
+
+                        elif tool == 'Bash':
+                            cmd = inp.get('command', '')
+                            for m in FILE_PATH_RE.finditer(cmd):
+                                fp = m.group(1).rstrip('.,;:')
+                                norm = normalize_path(fp)
+                                if norm:
+                                    files.add(norm)
+                                    ops[norm].add('bash')
 
     except (OSError, UnicodeDecodeError):
         return None
@@ -230,10 +303,14 @@ def normalize_path(fp: str) -> str | None:
         if pat.search(fp):
             return None
 
-    if not fp.startswith(VAULT_PREFIX):
+    home_prefix = str(Path.home()) + "/"
+    if fp.startswith(VAULT_PREFIX):
+        rel = fp[len(VAULT_PREFIX):]
+    elif fp.startswith(home_prefix):
+        rel = fp[len(home_prefix):]
+    else:
         return None
 
-    rel = fp[len(VAULT_PREFIX):]
     if not rel:
         return None
 
@@ -282,8 +359,15 @@ def recency_color(t: float) -> str:
     return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 
 
-def build_graph(sessions: list, min_files: int = 3) -> nx.Graph:
+def build_graph(sessions: list, min_files: int = 3):
     """Build graph with noise reduction."""
+    try:
+        import networkx as nx
+    except ImportError as exc:
+        raise SystemExit(
+            "session-graph.py requires networkx. Install it with `pip install networkx pyvis`."
+        ) from exc
+
     G = nx.Graph()
 
     # Count how many sessions reference each file - skip ultra-common ones
@@ -374,8 +458,15 @@ def build_graph(sessions: list, min_files: int = 3) -> nx.Graph:
     return G
 
 
-def render_graph(G: nx.Graph, output_path: str, date_label: str, sessions_meta: dict):
+def render_graph(G, output_path: str, date_label: str, sessions_meta: dict):
     """Render with Obsidian-style theme and interactive features."""
+    try:
+        from pyvis.network import Network
+    except ImportError as exc:
+        raise SystemExit(
+            "session-graph.py requires pyvis. Install it with `pip install networkx pyvis`."
+        ) from exc
+
     net = Network(
         height="100vh",
         width="100%",
@@ -1178,7 +1269,7 @@ def main():
     skipped = 0
 
     for proj_dir in project_dirs:
-        for filepath in proj_dir.glob("*.jsonl"):
+        for filepath in recall_day.iter_session_jsonl_files(proj_dir):
             try:
                 mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc)
                 if mtime < date_start - timedelta(days=1):
@@ -1199,7 +1290,12 @@ def main():
             if result and result['start_time'] >= date_start and result['start_time'] < date_end:
                 sessions.append(result)
 
-    sessions.sort(key=lambda s: s['start_time'])
+    deduped = {}
+    for session in sessions:
+        current = deduped.get(session['session_id'])
+        if current is None or session['start_time'] > current['start_time']:
+            deduped[session['session_id']] = session
+    sessions = sorted(deduped.values(), key=lambda s: s['start_time'])
 
     if args.day:
         sessions = filter_sessions_by_day(sessions, args.day)
