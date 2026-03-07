@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WRAPPER_SCRIPT = ROOT / "scripts" / "codex-memory"
-SYNC_SCRIPT = ROOT / "skills" / "sync-claude-sessions" / "scripts" / "claude-sessions"
+SYNC_SCRIPT = ROOT / "skills" / "sync-codex-sessions" / "scripts" / "codex-sessions"
 RECALL_DAY_SCRIPT = ROOT / "skills" / "recall" / "scripts" / "recall-day.py"
 EXTRACT_SCRIPT = ROOT / "skills" / "recall" / "scripts" / "extract-sessions.py"
 GRAPH_SCRIPT = ROOT / "skills" / "recall" / "scripts" / "session-graph.py"
@@ -141,13 +141,13 @@ class CodexSessionSupportTests(unittest.TestCase):
             out = sync_mod.sync_session("sess-3", str(transcript), quiet=True)
             self.assertTrue(out.exists())
             content = out.read_text(encoding="utf-8")
-            self.assertIn("agent_backend: codex", content)
+            self.assertIn("type: codex-session", content)
             self.assertEqual(
-                sync_mod.build_resume_command("codex", "sess-3", False),
+                sync_mod.build_resume_command("sess-3", False),
                 ["codex", "resume", "sess-3"],
             )
             self.assertEqual(
-                sync_mod.build_resume_command("codex", "sess-3", True),
+                sync_mod.build_resume_command("sess-3", True),
                 ["codex", "fork", "sess-3"],
             )
 

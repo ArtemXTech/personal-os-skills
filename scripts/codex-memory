@@ -18,7 +18,7 @@ SCRIPT_MAP = {
     "recall-day": REPO_ROOT / "skills" / "recall" / "scripts" / "recall-day.py",
     "extract-sessions": REPO_ROOT / "skills" / "recall" / "scripts" / "extract-sessions.py",
     "session-graph": REPO_ROOT / "skills" / "recall" / "scripts" / "session-graph.py",
-    "sync-sessions": REPO_ROOT / "skills" / "sync-claude-sessions" / "scripts" / "claude-sessions",
+    "sync-sessions": REPO_ROOT / "skills" / "sync-codex-sessions" / "scripts" / "codex-sessions",
 }
 
 

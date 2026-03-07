@@ -27,7 +27,7 @@ Example:
 python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
   --repo ArtemXTech/personal-os-skills \
   --path skills/recall \
-  --path skills/sync-claude-sessions
+  --path skills/sync-codex-sessions
 ```
 
 Restart Codex after installation.
@@ -64,7 +64,8 @@ uv run python scripts/codex-memory session-graph last week
 | [tasknotes](docs/tasknotes/) | Manage Obsidian tasks via TaskNotes API | [Video](https://youtu.be/ePFAVGcPh7U) · [Blog](https://artemxtech.github.io/AI-Powered-Task-Management-in-Obsidian-(TaskNotes-+-Claude-Code)) |
 | [notebooklm](skills/notebooklm/) | Import NotebookLM notebooks into Obsidian as linked knowledge graphs | [Video](https://youtu.be/qiOu7Ptjxng) |
 | [recall](skills/recall/) | Load context from previous sessions - Claude Code and Codex temporal recall, plus topic search (QMD) and graph visualization | [Video](https://youtu.be/RDoTY4_xh0s) · [Setup](docs/memory-skills-setup.md) |
-| [sync-claude-sessions](skills/sync-claude-sessions/) | Export Claude Code or Codex conversations to Obsidian markdown with sync/resume helpers | [Setup](docs/memory-skills-setup.md) |
+| [sync-claude-sessions](skills/sync-claude-sessions/) | Export Claude Code conversations to Obsidian markdown with auto-sync hooks | [Setup](docs/memory-skills-setup.md) |
+| [sync-codex-sessions](skills/sync-codex-sessions/) | Export Codex conversations to Obsidian markdown with resume/fork helpers | [Setup](docs/memory-skills-setup.md) |
 
 ## Links
 

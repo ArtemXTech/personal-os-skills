@@ -10,7 +10,7 @@ If you want to install the skills in Codex instead of Claude Code, use Codex's s
 python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
   --repo ArtemXTech/personal-os-skills \
   --path skills/recall \
-  --path skills/sync-claude-sessions
+  --path skills/sync-codex-sessions
 ```
 
 Then install the Python environment from the repo checkout:
@@ -175,7 +175,7 @@ alias cs="python3 .claude/skills/sync-claude-sessions/scripts/claude-sessions"
 Codex-friendly alias from the repo checkout:
 
 ```bash
-alias cs="uv run python scripts/codex-memory sync-sessions"
+alias cxs="uv run python scripts/codex-memory sync-sessions"
 ```
 
 ## Step 8: Codex Workflow
@@ -196,7 +196,7 @@ uv run python scripts/codex-memory session-graph last week \
   --min-files 1
 ```
 
-When you export a Codex session note, `cs resume` will resume it with `codex resume`, and `cs resume --fork` will use `codex fork`.
+When you export a Codex session note, `cxs resume` will resume it with `codex resume`, and `cxs resume --fork` will use `codex fork`.
 
 ## How It Works
 
@@ -233,7 +233,10 @@ uv run python scripts/codex-memory session-graph last week \
 ```
 
 ### /sync-claude-sessions
-Export conversations to Obsidian markdown with frontmatter, artifacts, and preserved notes.
+Export Claude Code conversations to Obsidian markdown with frontmatter, artifacts, and preserved notes.
+
+### /sync-codex-sessions
+Export Codex conversations to `Codex-Sessions/`, preserve notes/status/tags, and resume or fork the exported session directly back into Codex.
 
 ```bash
 cs export --today    # Export today's sessions
