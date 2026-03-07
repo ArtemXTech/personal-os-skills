@@ -101,7 +101,15 @@ def dedupe_session_metadata(items: list[dict]) -> list[dict]:
     for item in items:
         sid = item['session_id']
         current = latest.get(sid)
-        if current is None or item['start_time'] > current['start_time']:
+        current_key = (
+            current['file_mtime'].timestamp(),
+            current['start_time'].timestamp(),
+        ) if current is not None else None
+        item_key = (
+            item['file_mtime'].timestamp(),
+            item['start_time'].timestamp(),
+        )
+        if current is None or item_key > current_key:
             latest[sid] = item
     return sorted(latest.values(), key=lambda s: s['start_time'])
 
@@ -327,6 +335,7 @@ def scan_session_metadata(filepath: Path, date_start: datetime, date_end: dateti
     return {
         'session_id': session_id,
         'start_time': start_time,
+        'file_mtime': datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc),
         'user_msg_count': user_msg_count,
         'file_size': file_size,
         'title': title,

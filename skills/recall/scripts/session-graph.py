@@ -296,6 +296,7 @@ def extract_file_paths(jsonl_path: Path) -> dict | None:
         'ops': dict(ops),
         'session_id': session_id,
         'start_time': start_time,
+        'file_mtime': datetime.fromtimestamp(jsonl_path.stat().st_mtime, tz=timezone.utc),
         'title': title,
         'msg_count': user_msg_count,
         'filepath': str(jsonl_path),
@@ -1297,12 +1298,21 @@ def export_obsidian_graph_artifacts(sessions: list, export_dir: Path, date_label
     """Export native Obsidian graph artifacts as markdown notes linked by wikilinks."""
     selected, _ = select_graph_sessions(sessions, min_files)
     export_dir.mkdir(parents=True, exist_ok=True)
-    for stale in export_dir.glob("*.md"):
-        stale.unlink()
+    manifest_path = export_dir / ".session-graph-manifest.json"
+    if manifest_path.exists():
+        try:
+            previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for rel in previous.get("files", []):
+                stale = export_dir / rel
+                if stale.exists():
+                    stale.unlink()
+        except (OSError, json.JSONDecodeError):
+            pass
 
     file_to_sessions = defaultdict(list)
     session_note_names = {}
     file_note_names = {}
+    written_files = []
 
     for session in selected:
         sid = slugify_note_name(session['session_id'])
@@ -1341,6 +1351,7 @@ def export_obsidian_graph_artifacts(sessions: list, export_dir: Path, date_label
             lines.append(f"- [[{note}|{label}]]")
         lines.append("")
         note_path.write_text("\n".join(lines), encoding="utf-8")
+        written_files.append(note_path.name)
 
     for path, session_ids in sorted(file_to_sessions.items()):
         note_stem = file_note_names[path]
@@ -1365,6 +1376,7 @@ def export_obsidian_graph_artifacts(sessions: list, export_dir: Path, date_label
             lines.append(f"- [[{session_note}]]")
         lines.append("")
         note_path.write_text("\n".join(lines), encoding="utf-8")
+        written_files.append(note_path.name)
 
     index_path = export_dir / "session-graph-index.md"
     index_lines = [
@@ -1389,6 +1401,11 @@ def export_obsidian_graph_artifacts(sessions: list, export_dir: Path, date_label
         index_lines.append(f"- [[{note}|{session['title']}]]")
     index_lines.append("")
     index_path.write_text("\n".join(index_lines), encoding="utf-8")
+    written_files.append(index_path.name)
+    manifest_path.write_text(
+        json.dumps({"files": sorted(written_files)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     return {
         "sessions": len(selected),
@@ -1452,7 +1469,15 @@ def main():
     deduped = {}
     for session in sessions:
         current = deduped.get(session['session_id'])
-        if current is None or session['start_time'] > current['start_time']:
+        current_key = (
+            current['file_mtime'].timestamp(),
+            current['start_time'].timestamp(),
+        ) if current is not None else None
+        session_key = (
+            session['file_mtime'].timestamp(),
+            session['start_time'].timestamp(),
+        )
+        if current is None or session_key > current_key:
             deduped[session['session_id']] = session
     sessions = sorted(deduped.values(), key=lambda s: s['start_time'])
 

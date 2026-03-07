@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path("/home/tools/personal-os-skills")
+ROOT = Path(__file__).resolve().parent.parent
 WRAPPER_SCRIPT = ROOT / "scripts" / "codex-memory"
 SYNC_SCRIPT = ROOT / "skills" / "sync-claude-sessions" / "scripts" / "claude-sessions"
 RECALL_DAY_SCRIPT = ROOT / "skills" / "recall" / "scripts" / "recall-day.py"
@@ -78,6 +78,7 @@ class CodexSessionSupportTests(unittest.TestCase):
             a = root / "2026" / "03" / "08" / "rollout-a.jsonl"
             b = root / "2026" / "03" / "08" / "rollout-b.jsonl"
             write_codex_rollout(a, "sess-1", ["first title"])
+            time.sleep(0.01)
             write_codex_rollout(b, "sess-1", ["second title"])
 
             start = recall_day.datetime(2026, 3, 8, tzinfo=recall_day.timezone.utc)
@@ -90,6 +91,7 @@ class CodexSessionSupportTests(unittest.TestCase):
             deduped = recall_day.dedupe_session_metadata([meta_a, meta_b])
             self.assertEqual(len(deduped), 1)
             self.assertEqual(deduped[0]["session_id"], "sess-1")
+            self.assertEqual(deduped[0]["title"], "second title")
 
     def test_extract_sessions_codex_dedupes_latest_rollout(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -216,6 +218,45 @@ class CodexSessionSupportTests(unittest.TestCase):
             file_note = (export_dir / "file-tools__demo__README_md.md").read_text(encoding="utf-8")
             self.assertIn("[[session-sess-5]]", file_note)
 
+    def test_session_graph_manifest_preserves_unrelated_notes(self):
+        os.environ["SESSION_BACKEND"] = "codex"
+        graph_mod = load_module(GRAPH_SCRIPT, "session_graph_manifest_test")
+        with tempfile.TemporaryDirectory() as tmp:
+            export_dir = Path(tmp) / "obsidian-graph"
+            export_dir.mkdir(parents=True)
+            unrelated = export_dir / "manual-note.md"
+            unrelated.write_text("# Keep me\n", encoding="utf-8")
+
+            sessions = [
+                {
+                    "session_id": "sess-6",
+                    "start_time": graph_mod.datetime(2026, 3, 8, 10, 0, tzinfo=graph_mod.timezone.utc),
+                    "file_mtime": graph_mod.datetime(2026, 3, 8, 10, 1, tzinfo=graph_mod.timezone.utc),
+                    "title": "First export",
+                    "msg_count": 2,
+                    "filepath": "/tmp/a.jsonl",
+                    "files": {"tools/demo/README.md"},
+                }
+            ]
+            graph_mod.export_obsidian_graph_artifacts(sessions, export_dir, "2026-03-08", min_files=1)
+            self.assertTrue(unrelated.exists())
+
+            sessions = [
+                {
+                    "session_id": "sess-7",
+                    "start_time": graph_mod.datetime(2026, 3, 8, 11, 0, tzinfo=graph_mod.timezone.utc),
+                    "file_mtime": graph_mod.datetime(2026, 3, 8, 11, 1, tzinfo=graph_mod.timezone.utc),
+                    "title": "Second export",
+                    "msg_count": 3,
+                    "filepath": "/tmp/b.jsonl",
+                    "files": {"tools/demo/src/app.py"},
+                }
+            ]
+            graph_mod.export_obsidian_graph_artifacts(sessions, export_dir, "2026-03-08", min_files=1)
+            self.assertTrue(unrelated.exists())
+            self.assertFalse((export_dir / "session-sess-6.md").exists())
+            self.assertTrue((export_dir / "session-sess-7.md").exists())
+
     def test_session_graph_default_obsidian_export_dir_uses_vault(self):
         os.environ["VAULT_DIR"] = "/tmp/example-vault"
         graph_mod = load_module(GRAPH_SCRIPT, "session_graph_default_export_test")
@@ -227,6 +268,7 @@ class CodexSessionSupportTests(unittest.TestCase):
         self.assertIn('os.environ.setdefault("SESSION_BACKEND", "codex")', content)
         self.assertIn('"session-graph"', content)
         self.assertIn('"sync-sessions"', content)
+        self.assertIn("sys.executable", content)
 
 
 if __name__ == "__main__":

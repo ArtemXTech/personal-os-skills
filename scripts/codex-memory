@@ -37,7 +37,7 @@ def main() -> int:
         return 2
 
     os.environ.setdefault("SESSION_BACKEND", "codex")
-    os.execvp("python3", ["python3", str(script), *sys.argv[2:]])
+    os.execvp(sys.executable, [sys.executable, str(script), *sys.argv[2:]])
 
 
 if __name__ == "__main__":
