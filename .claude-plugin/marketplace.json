@@ -62,6 +62,15 @@
       "skills": [
         "./skills/sync-claude-sessions"
       ]
+    },
+    {
+      "name": "sync-codex-sessions-skill",
+      "description": "Sync Codex sessions to Obsidian markdown with export, resume, and notes",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/sync-codex-sessions"
+      ]
     }
   ]
 }

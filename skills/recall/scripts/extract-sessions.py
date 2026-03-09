@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract user messages from Claude Code session logs into QMD-friendly markdown.
+"""Extract user messages from Claude Code or Codex session logs into QMD-friendly markdown.
 
 Usage:
     python3 extract-sessions.py [--days 21] [--source DIR] [--output DIR]
@@ -25,8 +25,27 @@ import argparse
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+CLAUDE_BACKEND = "claude"
+CODEX_BACKEND = "codex"
+
+def _detect_backend():
+    override = os.environ.get("SESSION_BACKEND", "").strip().lower()
+    if override in {CLAUDE_BACKEND, CODEX_BACKEND}:
+        return override
+    cwd = os.getcwd()
+    encoded = cwd.replace("/", "-")
+    candidate = os.path.expanduser(f"~/.claude/projects/{encoded}")
+    if os.path.isdir(candidate):
+        return CLAUDE_BACKEND
+    codex_sessions = os.path.expanduser("~/.codex/sessions")
+    if os.path.isdir(codex_sessions):
+        return CODEX_BACKEND
+    return CLAUDE_BACKEND
+
 def _detect_default_source():
-    """Auto-detect Claude project directory from CWD."""
+    """Auto-detect Claude or Codex session source directory."""
+    if _detect_backend() == CODEX_BACKEND:
+        return os.path.expanduser("~/.codex/sessions")
     cwd = os.getcwd()
     encoded = cwd.replace("/", "-")
     candidate = os.path.expanduser(f"~/.claude/projects/{encoded}")
@@ -56,6 +75,22 @@ def _detect_default_output():
 DEFAULT_SOURCE = _detect_default_source()
 DEFAULT_OUTPUT = _detect_default_output()
 DEFAULT_DAYS = 21
+SESSION_BACKEND = _detect_backend()
+
+
+def get_rollout_session_id(filepath: str) -> str:
+    """Read the canonical session/thread id from a Claude or Codex JSONL file."""
+    try:
+        with open(filepath, encoding="utf-8") as f:
+            for line in f:
+                obj = json.loads(line)
+                if obj.get('type') == 'session_meta':
+                    return obj.get('payload', {}).get('id') or Path(filepath).stem
+                if obj.get('sessionId'):
+                    return obj['sessionId']
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    return Path(filepath).stem
 
 # Patterns to strip from user messages
 STRIP_PATTERNS = [
@@ -103,7 +138,7 @@ def derive_title(messages: list[dict]) -> str:
 
 
 def extract_session(filepath: str) -> dict | None:
-    """Extract user messages from a single JSONL session file."""
+    """Extract user messages from a single Claude or Codex JSONL session file."""
     messages = []
     session_id = None
     first_ts = None
@@ -115,16 +150,32 @@ def extract_session(filepath: str) -> dict | None:
             except json.JSONDecodeError:
                 continue
 
-            if not session_id and obj.get('sessionId'):
-                session_id = obj['sessionId']
-
-            if obj.get('type') != 'user':
-                continue
-            if obj.get('message', {}).get('role') != 'user':
-                continue
-
-            content = obj['message'].get('content', '')
-            timestamp = obj.get('timestamp', '')
+            if SESSION_BACKEND == CODEX_BACKEND:
+                if obj.get('type') == 'session_meta' and not session_id:
+                    session_id = obj.get('payload', {}).get('id')
+                    first_ts = first_ts or obj.get('payload', {}).get('timestamp') or obj.get('timestamp', '')
+                    continue
+                if obj.get('type') != 'response_item':
+                    continue
+                payload = obj.get('payload', {})
+                if payload.get('type') != 'message' or payload.get('role') != 'user':
+                    continue
+                blocks = payload.get('content', [])
+                content = "\n".join(
+                    item.get('text', '')
+                    for item in blocks
+                    if isinstance(item, dict) and item.get('type') == 'input_text'
+                )
+                timestamp = obj.get('timestamp', '')
+            else:
+                if not session_id and obj.get('sessionId'):
+                    session_id = obj['sessionId']
+                if obj.get('type') != 'user':
+                    continue
+                if obj.get('message', {}).get('role') != 'user':
+                    continue
+                content = obj['message'].get('content', '')
+                timestamp = obj.get('timestamp', '')
 
             cleaned = clean_content(content)
             if not cleaned or len(cleaned) < 5:
@@ -207,15 +258,26 @@ def write_session_md(session: dict, output_dir: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Extract user messages from Claude Code sessions')
+    parser = argparse.ArgumentParser(description='Extract user messages from Claude Code or Codex sessions')
     parser.add_argument('--days', type=int, default=DEFAULT_DAYS, help=f'How many days back to extract (default: {DEFAULT_DAYS})')
     parser.add_argument('--source', default=DEFAULT_SOURCE, help='Source directory with JSONL files')
     parser.add_argument('--output', default=DEFAULT_OUTPUT, help='Output directory for markdown files')
     args = parser.parse_args()
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=args.days)
-    pattern = os.path.join(args.source, "*.jsonl")
-    all_files = glob.glob(pattern)
+    if SESSION_BACKEND == CODEX_BACKEND:
+        pattern = os.path.join(args.source, "**", "*.jsonl")
+        all_files = glob.glob(pattern, recursive=True)
+        latest_by_id = {}
+        for f in all_files:
+            sid = get_rollout_session_id(f)
+            current = latest_by_id.get(sid)
+            if current is None or os.path.getmtime(f) > os.path.getmtime(current):
+                latest_by_id[sid] = f
+        all_files = list(latest_by_id.values())
+    else:
+        pattern = os.path.join(args.source, "*.jsonl")
+        all_files = glob.glob(pattern)
 
     # Filter by file modification time
     recent_files = []

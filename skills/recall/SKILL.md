@@ -11,16 +11,16 @@ Three modes: temporal (date-based session timeline), topic (BM25 search across Q
 
 ## What It Does
 
-- **Temporal queries** ("yesterday", "last week", "what was I doing"): Scans native Claude Code JSONL files by date. Shows a table of sessions with time, message count, and first message. Expand any session for conversation details.
+- **Temporal queries** ("yesterday", "last week", "what was I doing"): Scans native Claude Code or Codex JSONL files by date. Shows a table of sessions with time, message count, and first message. Expand any session for conversation details.
 - **Topic queries** ("QMD video", "authentication"): BM25 search across sessions, notes, and daily logs in QMD collections.
-- **Graph queries** ("graph yesterday", "graph last week"): Generates an interactive HTML graph showing sessions as nodes connected to files they touched. Sessions colored by day, files colored by folder. Clusters reveal related work streams, shared files show cross-session dependencies.
+- **Graph queries** ("graph yesterday", "graph last week"): Generates an interactive HTML graph showing Claude Code or Codex sessions as nodes connected to files they touched. Sessions colored by day, files colored by folder. Clusters reveal related work streams, shared files show cross-session dependencies.
 - **One Thing synthesis**: After presenting results, synthesizes the single most impactful next action based on what has momentum, what's blocked, and what's closest to done. Not generic - specific and actionable.
 
-No custom setup needed for temporal recall - every Claude Code user has JSONL files.
+No custom setup needed for temporal recall - both Claude Code and Codex persist JSONL session history locally.
 
 ## Auto-Indexing (Optional)
 
-You can auto-index sessions into QMD on every session end via a Claude Code hook. See AGENTS.md for setup instructions.
+You can auto-index sessions into QMD on every session end via a Claude Code hook. Codex support is currently focused on reading/exporting saved sessions; hook docs are still Claude-oriented.
 
 ## Usage
 
@@ -40,7 +40,12 @@ You can auto-index sessions into QMD on every session end via a Claude Code hook
 /recall graph last 3 days      # recent activity window
 ```
 
-Graph options: `--min-files 5` for cleaner graphs (only sessions touching 5+ files), `--all-projects` to scan beyond current vault.
+Graph options: `--min-files 5` for cleaner graphs (only sessions touching 5+ files), `--all-projects` to scan beyond current vault, `--obsidian-export DIR` to create native Obsidian graph notes.
+
+Example:
+```bash
+uv run python /path/to/personal-os-skills/scripts/codex-memory session-graph last week
+```
 
 ## Workflow
 

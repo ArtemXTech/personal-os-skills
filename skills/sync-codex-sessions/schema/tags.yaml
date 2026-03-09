@@ -1,0 +1,221 @@
+# Claude Session Tags Schema
+# Agent reads this file for valid tags and auto-detection keywords
+# Location: .claude/skills/sync-claude-sessions/schema/tags.yaml
+
+tags:
+  # === Type of Work ===
+
+  research:
+    description: "Deep investigation of specific topics, gathering information, and exploring solutions."
+    keywords:
+      - "figure out"
+      - "research"
+      - "explore"
+      - "find information"
+      - "how to"
+      - "setup guide"
+    examples:
+      - "YouTube Studio Setup Research - extensive product research and budget breakdown"
+      - "Lab onboarding workflow design - investigating client onboarding process"
+      - "Vault analysis and frontmatter schema investigation"
+
+  implementation:
+    description: "Building, coding, or executing features and technical solutions."
+    keywords:
+      - "implement"
+      - "build"
+      - "create skill"
+      - "develop"
+      - "code"
+      - "execute"
+      - "script"
+    examples:
+      - "Sync-claude-sessions skill refactoring with core.py extraction"
+      - "Fitness-log skill design and Excalidraw diagram creation"
+      - "Lab automation pipeline design with Zoom transcript processing"
+
+  debugging:
+    description: "Troubleshooting problems, fixing broken functionality, and root cause analysis."
+    keywords:
+      - "debug"
+      - "fix"
+      - "error"
+      - "broken"
+      - "doesn't work"
+      - "not rendering"
+      - "issue"
+      - "troubleshoot"
+    examples:
+      - "Excalidraw scorecard diagram rendering - missing link property"
+      - "Fitness-log skill macro estimation and image handling"
+      - "Claude Code session sync hook development"
+
+  planning:
+    description: "Strategy design, workflow architecture, and decision-making around approaches."
+    keywords:
+      - "plan"
+      - "strategy"
+      - "workflow"
+      - "design"
+      - "approach"
+      - "roadmap"
+      - "priorities"
+      - "system"
+    examples:
+      - "Lab automation detailed planning - Zoom processing, YouTube upload"
+      - "Priority system design and command center architecture"
+      - "Sync-claude-sessions skill refactoring with workflows"
+
+  brainstorm:
+    description: "Open-ended ideation, exploring possibilities, and conceptual thinking."
+    keywords:
+      - "brainstorm"
+      - "ideas"
+      - "explore"
+      - "what if"
+      - "concept"
+      - "spinoff"
+      - "creative"
+    examples:
+      - "OpenClaw vs Claude Code video concepts with comparison scorecard"
+      - "Lab week 3 content and workshop improvements"
+      - "Vault entity analysis and frontmatter schema exploration"
+
+  admin:
+    description: "Administrative tasks, application processes, bureaucratic requirements."
+    keywords:
+      - "form"
+      - "application"
+      - "document"
+      - "onboard"
+      - "paperwork"
+      - "setup"
+      - "config"
+      - "permit"
+    examples:
+      - "PGWP application - document collection and form filling"
+      - "Lab client onboarding workflow and GitHub invite process"
+      - "Samsung T7 backup and GitHub recovery codes transfer"
+
+  quick:
+    description: "Short, focused, single-purpose tasks completed in one session."
+    keywords:
+      - "quick"
+      - "fast"
+      - "simple"
+      - "add"
+      - "update"
+      - "brief"
+      - "one thing"
+    examples:
+      - "Alfred text expansion setup request"
+      - "Hook testing and basic conversation"
+      - "iPad Obsidian hidden files display question"
+
+  video:
+    description: "Video production, scripting, slides, and content creation for YouTube."
+    keywords:
+      - "video"
+      - "slide"
+      - "script"
+      - "youtube"
+      - "outline"
+      - "thumbnail"
+      - "recording"
+    examples:
+      - "OpenClaw vs Claude Code video slides creation"
+      - "Video outline for Claude Code features"
+      - "Lab thumbnail generation with style variations"
+
+  automation:
+    description: "Setting up automated workflows, scripts, and continuous processes."
+    keywords:
+      - "automation"
+      - "script"
+      - "hook"
+      - "workflow"
+      - "auto-sync"
+      - "background"
+      - "trigger"
+    examples:
+      - "Lab automation with Zoom transcripts, YouTube upload"
+      - "Live session sync hook for Claude Code"
+      - "Sync-claude-sessions live hook and batch export"
+
+  writing:
+    description: "Content writing, email drafting, and documentation creation."
+    keywords:
+      - "write"
+      - "email"
+      - "draft"
+      - "content"
+      - "document"
+      - "article"
+      - "description"
+    examples:
+      - "Workshop postponement email drafting"
+      - "Partnership call reflection notes"
+      - "Session documentation and braindump processing"
+
+  # === Project Tags ===
+
+  lab:
+    description: "Artem's Lab program content, automation, onboarding, and workshop delivery."
+    keywords:
+      - "lab"
+      - "week"
+      - "workshop"
+      - "student"
+      - "course"
+      - "transcript"
+      - "zoom"
+    examples:
+      - "Lab thumbnails generation with style variations"
+      - "Lab week 3 preparation and automation research"
+      - "Lab onboarding for Alfredo with GitHub access"
+
+  openclaw:
+    description: "Research, features, and comparison work related to OpenClaw personal AI system."
+    keywords:
+      - "openclaw"
+      - "clawdbot"
+      - "soul.md"
+      - "telegram"
+      - "personal assistant"
+    examples:
+      - "OpenClaw vs Claude Code video production"
+      - "Pi agent harness research and OpenClaw architecture"
+      - "OpenClaw security audit findings"
+
+  personal:
+    description: "Personal development, health, fitness, finances, and life management."
+    keywords:
+      - "fitness"
+      - "gym"
+      - "health"
+      - "money"
+      - "personal"
+      - "goal"
+      - "nutrition"
+      - "sleep"
+      - "energy"
+    examples:
+      - "Fitness-log skill for meal tracking"
+      - "Fitness program research, money relationship"
+      - "Evening check-in with fitness goals"
+
+  client:
+    description: "Client work, partnerships, calls, and business development conversations."
+    keywords:
+      - "call"
+      - "client"
+      - "partnership"
+      - "business"
+      - "proposal"
+      - "meeting"
+      - "onepager"
+      - "follow-up"
+    examples:
+      - "Anastasia partnership call preparation"
+      - "Moe and Anastasia follow-up drafting"
+      - "Client onboarding workflow design"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recall sessions by date from native Claude Code JSONL files.
+"""Recall sessions by date from native Claude Code or Codex JSONL files.
 
 Usage:
     recall-day.py list DATE_EXPR [--project PATH] [--all-projects] [--min-msgs N]
@@ -20,7 +20,24 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+CLAUDE_BACKEND = "claude"
+CODEX_BACKEND = "codex"
 CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
+CODEX_SESSIONS = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
+
+def detect_backend() -> str:
+    override = os.environ.get("SESSION_BACKEND", "").strip().lower()
+    if override in {CLAUDE_BACKEND, CODEX_BACKEND}:
+        return override
+    cwd = os.getcwd()
+    encoded = cwd.replace("/", "-")
+    if (CLAUDE_PROJECTS / encoded).exists():
+        return CLAUDE_BACKEND
+    if CODEX_SESSIONS.exists():
+        return CODEX_BACKEND
+    return CLAUDE_BACKEND
+
+SESSION_BACKEND = detect_backend()
 
 # Reuse from extract-sessions.py
 STRIP_PATTERNS = [
@@ -60,6 +77,71 @@ def extract_text(content) -> str:
                 parts.append(block)
         return '\n'.join(parts)
     return ""
+
+
+def extract_codex_user_text(payload: dict) -> str:
+    """Extract concatenated user text from a Codex message payload."""
+    parts = []
+    for item in payload.get('content', []):
+        if isinstance(item, dict) and item.get('type') == 'input_text':
+            text = item.get('text', '')
+            if text:
+                parts.append(text)
+    return '\n'.join(parts)
+
+
+def iter_session_jsonl_files(proj_dir: Path):
+    """Iterate session files for the active backend."""
+    return proj_dir.rglob("*.jsonl") if SESSION_BACKEND == CODEX_BACKEND else proj_dir.glob("*.jsonl")
+
+
+def dedupe_session_metadata(items: list[dict]) -> list[dict]:
+    """Keep only the latest metadata row for each session id."""
+    latest: dict[str, dict] = {}
+    for item in items:
+        sid = item['session_id']
+        current = latest.get(sid)
+        current_key = (
+            current['file_mtime'].timestamp(),
+            current['start_time'].timestamp(),
+        ) if current is not None else None
+        item_key = (
+            item['file_mtime'].timestamp(),
+            item['start_time'].timestamp(),
+        )
+        if current is None or item_key > current_key:
+            latest[sid] = item
+    return sorted(latest.values(), key=lambda s: s['start_time'])
+
+
+def find_latest_matching_session_file(project_dirs: list[Path], target_id: str) -> Path | None:
+    """Find the newest file matching a session id or rollout stem."""
+    matches = []
+    for proj_dir in project_dirs:
+        for filepath in iter_session_jsonl_files(proj_dir):
+            stem = filepath.stem.lower()
+            if stem.startswith(target_id) or target_id in stem:
+                matches.append(filepath)
+                continue
+
+            try:
+                with open(filepath, encoding='utf-8') as f:
+                    for line in f:
+                        obj = json.loads(line)
+                        if obj.get('type') == 'session_meta':
+                            sid = (obj.get('payload', {}).get('id') or '').lower()
+                            if sid.startswith(target_id):
+                                matches.append(filepath)
+                            break
+                        if obj.get('sessionId') and str(obj['sessionId']).lower().startswith(target_id):
+                            matches.append(filepath)
+                            break
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+
+    if not matches:
+        return None
+    return max(matches, key=lambda p: p.stat().st_mtime)
 
 
 def parse_date_expr(expr: str) -> tuple[datetime, datetime]:
@@ -127,7 +209,16 @@ def parse_date_expr(expr: str) -> tuple[datetime, datetime]:
 
 
 def get_project_dirs(project_path: str | None, all_projects: bool) -> list[Path]:
-    """Get list of project directories to scan."""
+    """Get list of source directories to scan."""
+    if SESSION_BACKEND == CODEX_BACKEND:
+        if project_path:
+            p = Path(project_path)
+            if p.exists():
+                return [p]
+            print(f"Error: Project path not found: {project_path}", file=sys.stderr)
+            sys.exit(1)
+        return [CODEX_SESSIONS]
+
     if project_path:
         encoded = project_path.replace('/', '-')
         p = CLAUDE_PROJECTS / encoded
@@ -154,7 +245,7 @@ def get_project_dirs(project_path: str | None, all_projects: bool) -> list[Path]
 
 
 def scan_session_metadata(filepath: Path, date_start: datetime, date_end: datetime) -> dict | None:
-    """Fast scan: read first ~30 lines for metadata, count user messages."""
+    """Fast scan: read session metadata, count user messages, derive title."""
     session_id = filepath.stem
     start_time = None
     first_user_msg = None
@@ -169,27 +260,48 @@ def scan_session_metadata(filepath: Path, date_start: datetime, date_end: dateti
                 except json.JSONDecodeError:
                     continue
 
-                # Get session ID from data if available
-                if obj.get('sessionId'):
-                    session_id = obj['sessionId']
+                if SESSION_BACKEND == CODEX_BACKEND:
+                    if obj.get('type') == 'session_meta':
+                        payload = obj.get('payload', {})
+                        session_id = payload.get('id', session_id)
+                        ts_str = payload.get('timestamp') or obj.get('timestamp')
+                        if ts_str and not start_time:
+                            try:
+                                start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                            except (ValueError, TypeError):
+                                pass
+                        continue
+                    if obj.get('type') == 'response_item':
+                        payload = obj.get('payload', {})
+                        if payload.get('type') == 'message' and payload.get('role') == 'user':
+                            user_msg_count += 1
+                            if first_user_msg is None:
+                                raw = extract_codex_user_text(payload)
+                                cleaned = clean_content(raw)
+                                if cleaned and len(cleaned) >= 5 and not re.match(r'^/\w+\s*$', cleaned):
+                                    first_user_msg = cleaned
+                else:
+                    # Get session ID from data if available
+                    if obj.get('sessionId'):
+                        session_id = obj['sessionId']
 
-                ts_str = obj.get('timestamp')
-                if ts_str and not start_time:
-                    try:
-                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                    except (ValueError, TypeError):
-                        pass
+                    ts_str = obj.get('timestamp')
+                    if ts_str and not start_time:
+                        try:
+                            start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        except (ValueError, TypeError):
+                            pass
 
-                # Count user messages and capture first
-                if obj.get('type') == 'user' and obj.get('message', {}).get('role') == 'user':
-                    user_msg_count += 1
-                    if first_user_msg is None:
-                        raw = extract_text(obj['message'].get('content', ''))
-                        cleaned = clean_content(raw)
-                        if cleaned and len(cleaned) >= 5:
-                            # Skip pure slash commands
-                            if not re.match(r'^/\w+\s*$', cleaned):
-                                first_user_msg = cleaned
+                    # Count user messages and capture first
+                    if obj.get('type') == 'user' and obj.get('message', {}).get('role') == 'user':
+                        user_msg_count += 1
+                        if first_user_msg is None:
+                            raw = extract_text(obj['message'].get('content', ''))
+                            cleaned = clean_content(raw)
+                            if cleaned and len(cleaned) >= 5:
+                                # Skip pure slash commands
+                                if not re.match(r'^/\w+\s*$', cleaned):
+                                    first_user_msg = cleaned
 
                 # Early exit: if we have start_time and it's outside range, skip
                 if start_time and i < 5:
@@ -223,6 +335,7 @@ def scan_session_metadata(filepath: Path, date_start: datetime, date_end: dateti
     return {
         'session_id': session_id,
         'start_time': start_time,
+        'file_mtime': datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc),
         'user_msg_count': user_msg_count,
         'file_size': file_size,
         'title': title,
@@ -250,7 +363,7 @@ def cmd_list(args):
     total_scanned = 0
 
     for proj_dir in project_dirs:
-        jsonl_files = list(proj_dir.glob("*.jsonl"))
+        jsonl_files = list(iter_session_jsonl_files(proj_dir))
         total_scanned += len(jsonl_files)
 
         for filepath in jsonl_files:
@@ -272,7 +385,7 @@ def cmd_list(args):
 
             sessions.append(meta)
 
-    sessions.sort(key=lambda s: s['start_time'])
+    sessions = dedupe_session_metadata(sessions)
 
     # Format date range for header
     if date_end - date_start <= timedelta(days=1):
@@ -316,14 +429,7 @@ def cmd_expand(args):
     target_id = args.session_id.lower()
 
     # Find the JSONL file
-    target_file = None
-    for proj_dir in project_dirs:
-        for filepath in proj_dir.glob("*.jsonl"):
-            if filepath.stem.lower().startswith(target_id):
-                target_file = filepath
-                break
-        if target_file:
-            break
+    target_file = find_latest_matching_session_file(project_dirs, target_id)
 
     if not target_file:
         print(f"Error: No session found matching '{args.session_id}'", file=sys.stderr)
@@ -357,41 +463,64 @@ def cmd_expand(args):
                 except (ValueError, TypeError):
                     pass
 
-            if msg_type == 'user' and role == 'user':
-                raw = extract_text(msg.get('content', ''))
-                cleaned = clean_content(raw)
-                if not cleaned or len(cleaned) < 5:
+            if SESSION_BACKEND == CODEX_BACKEND:
+                if msg_type != 'response_item':
                     continue
-                if re.match(r'^/\w+\s*$', cleaned):
-                    continue
+                payload = obj.get('payload', {})
+                if payload.get('type') == 'message' and payload.get('role') == 'user':
+                    cleaned = clean_content(extract_codex_user_text(payload))
+                    if not cleaned or len(cleaned) < 5 or re.match(r'^/\w+\s*$', cleaned):
+                        continue
+                    msg_count += 1
+                    if max_msgs and msg_count > max_msgs:
+                        print(f"\n... truncated at {max_msgs} messages (use --max-msgs to show more)")
+                        break
+                    display = cleaned[:197] + '...' if len(cleaned) > 200 else cleaned
+                    display = display.replace('\n', '\n    ')
+                    print(f"[{ts_label}] USER: {display}")
+                elif payload.get('type') == 'message' and payload.get('role') == 'assistant':
+                    for block in payload.get('content', []):
+                        if isinstance(block, dict) and block.get('type') == 'output_text':
+                            text = block.get('text', '')
+                            first_line = text.split('\n')[0][:120]
+                            if first_line.strip():
+                                print(f"  [{ts_label}] ASST: {first_line}")
+                            break
+                elif payload.get('type') == 'function_call':
+                    tool_name = payload.get('name', '?')
+                    print(f"  [{ts_label}] TOOL: {tool_name}")
+            else:
+                if msg_type == 'user' and role == 'user':
+                    raw = extract_text(msg.get('content', ''))
+                    cleaned = clean_content(raw)
+                    if not cleaned or len(cleaned) < 5:
+                        continue
+                    if re.match(r'^/\w+\s*$', cleaned):
+                        continue
 
-                msg_count += 1
-                if max_msgs and msg_count > max_msgs:
-                    print(f"\n... truncated at {max_msgs} messages (use --max-msgs to show more)")
-                    break
+                    msg_count += 1
+                    if max_msgs and msg_count > max_msgs:
+                        print(f"\n... truncated at {max_msgs} messages (use --max-msgs to show more)")
+                        break
 
-                # Truncate long messages
-                display = cleaned
-                if len(display) > 200:
-                    display = display[:197] + '...'
-                display = display.replace('\n', '\n    ')
+                    display = cleaned[:197] + '...' if len(cleaned) > 200 else cleaned
+                    display = display.replace('\n', '\n    ')
+                    print(f"[{ts_label}] USER: {display}")
 
-                print(f"[{ts_label}] USER: {display}")
-
-            elif msg_type == 'assistant' and role == 'assistant':
-                content = msg.get('content', [])
-                if isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict):
-                            if block.get('type') == 'text':
-                                text = block.get('text', '')
-                                first_line = text.split('\n')[0][:120]
-                                if first_line.strip():
-                                    print(f"  [{ts_label}] ASST: {first_line}")
-                                break
-                            elif block.get('type') == 'tool_use':
-                                tool_name = block.get('name', '?')
-                                print(f"  [{ts_label}] TOOL: {tool_name}")
+                elif msg_type == 'assistant' and role == 'assistant':
+                    content = msg.get('content', [])
+                    if isinstance(content, list):
+                        for block in content:
+                            if isinstance(block, dict):
+                                if block.get('type') == 'text':
+                                    text = block.get('text', '')
+                                    first_line = text.split('\n')[0][:120]
+                                    if first_line.strip():
+                                        print(f"  [{ts_label}] ASST: {first_line}")
+                                    break
+                                elif block.get('type') == 'tool_use':
+                                    tool_name = block.get('name', '?')
+                                    print(f"  [{ts_label}] TOOL: {tool_name}")
 
     print(f"\n{msg_count} user messages total")
 

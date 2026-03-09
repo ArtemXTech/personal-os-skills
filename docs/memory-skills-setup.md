@@ -2,6 +2,30 @@
 
 Agent-readable setup guide. Follow these steps to give Claude Code persistent memory across sessions using QMD local search and Obsidian.
 
+Codex note: the session parsing scripts now understand Codex rollouts in `~/.codex/sessions`, but the install paths and hook examples in this document are still written for Claude Code.
+
+If you want to install the skills in Codex instead of Claude Code, use Codex's skill installer:
+
+```bash
+python3 ~/.codex/skills/skill-installer/scripts/install-skill-from-github.py \
+  --repo ArtemXTech/personal-os-skills \
+  --path skills/recall \
+  --path skills/sync-codex-sessions
+```
+
+Then install the Python environment from the repo checkout:
+
+```bash
+cd /path/to/personal-os-skills
+uv sync
+```
+
+Optional Codex helper wrapper from the repo checkout:
+
+```bash
+uv run python scripts/codex-memory --help
+```
+
 ## Prerequisites
 
 - Claude Code installed and working
@@ -57,16 +81,16 @@ Replace `/path/to/your/vault` with your actual Obsidian vault path.
 
 ## Step 4: Install Python Dependencies
 
-The graph visualization requires NetworkX and pyvis:
+The graph visualization requires NetworkX and pyvis. This repo now includes a `uv` project:
 
 ```bash
-pip install networkx pyvis
+uv sync
 ```
 
-Or with uv:
+Run the scripts with `uv run`:
 
 ```bash
-uv pip install networkx pyvis
+uv run python skills/recall/scripts/session-graph.py today --min-msgs 1 --min-files 1
 ```
 
 ## Step 5: Set Up Auto-Sync Hook (Optional)
@@ -148,6 +172,32 @@ Add a `SessionEnd` hook to `~/.claude/settings.json`:
 alias cs="python3 .claude/skills/sync-claude-sessions/scripts/claude-sessions"
 ```
 
+Codex-friendly alias from the repo checkout:
+
+```bash
+alias cxs="uv run python scripts/codex-memory sync-sessions"
+```
+
+## Step 8: Codex Workflow
+
+Typical Codex workflow from the repo checkout:
+
+```bash
+# Export saved Codex sessions into Obsidian markdown
+uv run python scripts/codex-memory sync-sessions export --all
+
+# Recall recent Codex sessions by date
+uv run python scripts/codex-memory recall-day list last week --min-msgs 1
+
+# Build the interactive HTML graph plus native Obsidian graph notes.
+# If VAULT_DIR is set (or CWD is inside a vault), the Obsidian export path is chosen automatically.
+uv run python scripts/codex-memory session-graph last week \
+  --min-msgs 1 \
+  --min-files 1
+```
+
+When you export a Codex session note, `cxs resume` will resume it with `codex resume`, and `cxs resume --fork` will use `codex fork`.
+
 ## How It Works
 
 ### /recall (temporal)
@@ -175,8 +225,18 @@ Interactive HTML visualization of sessions and files touched. Requires networkx 
 /recall graph yesterday
 ```
 
+Native Obsidian graph export:
+
+```bash
+uv run python scripts/codex-memory session-graph last week \
+  --obsidian-export /path/to/your/vault/Session-Graphs/last-week
+```
+
 ### /sync-claude-sessions
-Export conversations to Obsidian markdown with frontmatter, artifacts, and preserved notes.
+Export Claude Code conversations to Obsidian markdown with frontmatter, artifacts, and preserved notes.
+
+### /sync-codex-sessions
+Export Codex conversations to `Codex-Sessions/`, preserve notes/status/tags, and resume or fork the exported session directly back into Codex.
 
 ```bash
 cs export --today    # Export today's sessions
@@ -195,4 +255,5 @@ cs close "done"      # Mark session done
 All scripts auto-detect paths:
 - **Vault directory**: walks up from CWD looking for `.obsidian/` folder, or uses `VAULT_DIR` env var
 - **Claude project directory**: derives from CWD using Claude Code's encoding scheme (`/path/to/dir` -> `-path-to-dir`)
+- **Codex session directory**: uses `~/.codex/sessions` when `SESSION_BACKEND=codex` or when Claude project logs are not present
 - **No hardcoded paths** - works with any vault, any username, any OS

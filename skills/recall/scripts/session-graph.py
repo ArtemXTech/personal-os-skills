@@ -7,7 +7,7 @@ Usage:
 DATE_EXPR: same as recall-day.py (yesterday, "last week", 2026-02-25, etc.)
 --day: filter to specific day within range (e.g. "monday", "2026-02-20")
 
-Outputs interactive HTML to /tmp/session-graph.html and opens in browser.
+Outputs interactive HTML and can also export native Obsidian markdown graph artifacts.
 Features: Obsidian-style theme, neighbor highlighting on hover, click-to-select
 nodes, copy selected file paths to clipboard.
 """
@@ -20,9 +20,6 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
-import networkx as nx
-from pyvis.network import Network
 
 # Import recall-day as module
 import importlib.util
@@ -43,10 +40,24 @@ def _detect_vault_prefix():
     # Fallback: use CWD
     return str(cwd) + "/"
 
+
+def _detect_vault_dir() -> Path | None:
+    """Detect the actual Obsidian vault root, if available."""
+    if os.environ.get("VAULT_DIR"):
+        return Path(os.environ["VAULT_DIR"])
+    cwd = Path.cwd()
+    for parent in [cwd, *cwd.parents]:
+        if (parent / ".obsidian").is_dir():
+            return parent
+    return None
+
 VAULT_PREFIX = _detect_vault_prefix()
+VAULT_DIR = _detect_vault_dir()
+HOME_PREFIX = str(Path.home()) + "/"
 SKIP_PREFIXES = ["/tmp/", "/private/tmp/", "/dev/", "/var/", "/usr/"]
 SKIP_PATTERNS = [
     re.compile(r'\.claude/projects/'),
+    re.compile(r'\.codex/sessions/'),
     re.compile(r'node_modules/'),
     re.compile(r'\.git/'),
     re.compile(r'__pycache__/'),
@@ -54,7 +65,11 @@ SKIP_PATTERNS = [
 ]
 
 FILE_PATH_RE = re.compile(
-    r'(?:^|[\s"\'=])(' + re.escape(VAULT_PREFIX) + r'[^\s"\';<>|&\)]+)',
+    r'(?:^|[\s"\'=])(('
+    + re.escape(VAULT_PREFIX)
+    + r'|'
+    + re.escape(HOME_PREFIX)
+    + r')[^\s"\';<>|&\)]+)',
 )
 
 # Obsidian-inspired palette
@@ -86,6 +101,9 @@ FOLDER_COLORS = {
     "Notes/Docs/": "#CBD5E1",
     "Notes/Projects/": "#A7F3D0",
     ".claude/skills/": "#A5F3FC",
+    ".codex/skills/": "#A5F3FC",
+    "tools/": "#93C5FD",
+    "strato-space/": "#7DDCB5",
     "Templates/": "#FDE68A",
     "Daily/": "#BBF7D0",
     "External/": "#E7E5E4",
@@ -100,6 +118,9 @@ FILTERABLE_FOLDERS = [
     "Notes/Sessions/",
     "Notes/Content/",
     ".claude/skills/",
+    ".codex/skills/",
+    "tools/",
+    "strato-space/",
 ]
 
 # Files that are touched by almost every session - skip them
@@ -127,62 +148,126 @@ def extract_file_paths(jsonl_path: Path) -> dict | None:
                 except json.JSONDecodeError:
                     continue
 
-                if obj.get('sessionId'):
-                    session_id = obj['sessionId']
-
-                ts_str = obj.get('timestamp')
-                if ts_str and not start_time:
-                    try:
-                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                    except (ValueError, TypeError):
-                        pass
-
-                if obj.get('type') == 'user':
-                    user_msg_count += 1
-                    if first_user_msg is None:
-                        raw = recall_day.extract_text(obj.get('message', {}).get('content', ''))
-                        cleaned = recall_day.clean_content(raw)
-                        if cleaned and len(cleaned) >= 5:
-                            first_user_msg = cleaned
-
-                if obj.get('type') != 'assistant':
-                    continue
-
-                content = obj.get('message', {}).get('content', [])
-                if not isinstance(content, list):
-                    continue
-
-                for block in content:
-                    if not isinstance(block, dict) or block.get('type') != 'tool_use':
+                if recall_day.SESSION_BACKEND == recall_day.CODEX_BACKEND:
+                    if obj.get('type') == 'session_meta':
+                        payload = obj.get('payload', {})
+                        session_id = payload.get('id', session_id)
+                        ts_str = payload.get('timestamp') or obj.get('timestamp')
+                        if ts_str and not start_time:
+                            try:
+                                start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                            except (ValueError, TypeError):
+                                pass
                         continue
 
-                    tool = block.get('name', '')
-                    inp = block.get('input', {})
+                    if obj.get('type') != 'response_item':
+                        continue
 
-                    if tool in ('Read', 'Edit', 'Write', 'NotebookEdit'):
-                        fp = inp.get('file_path') or inp.get('notebook_path', '')
-                        if fp:
-                            norm = normalize_path(fp)
-                            if norm:
-                                files.add(norm)
-                                ops[norm].add(tool.lower())
+                    payload = obj.get('payload', {})
+                    if payload.get('type') == 'message' and payload.get('role') == 'user':
+                        user_msg_count += 1
+                        if first_user_msg is None:
+                            raw = recall_day.extract_codex_user_text(payload)
+                            cleaned = recall_day.clean_content(raw)
+                            if cleaned and len(cleaned) >= 5:
+                                first_user_msg = cleaned
+                        continue
 
-                    elif tool in ('Glob', 'Grep'):
-                        fp = inp.get('path', '')
-                        if fp:
-                            norm = normalize_path(fp)
-                            if norm:
-                                files.add(norm)
-                                ops[norm].add('search')
+                    if payload.get('type') != 'function_call':
+                        continue
 
-                    elif tool == 'Bash':
-                        cmd = inp.get('command', '')
-                        for m in FILE_PATH_RE.finditer(cmd):
-                            fp = m.group(1).rstrip('.,;:')
-                            norm = normalize_path(fp)
-                            if norm:
-                                files.add(norm)
-                                ops[norm].add('bash')
+                    tool = payload.get('name', '')
+                    args_raw = payload.get('arguments', '')
+                    try:
+                        inp = json.loads(args_raw) if isinstance(args_raw, str) else {}
+                    except json.JSONDecodeError:
+                        inp = {}
+
+                    if tool == 'apply_patch' and isinstance(args_raw, str):
+                        for marker in ('*** Update File: ', '*** Add File: '):
+                            for line in args_raw.splitlines():
+                                if line.startswith(marker):
+                                    norm = normalize_path(line[len(marker):].strip())
+                                    if norm:
+                                        files.add(norm)
+                                        ops[norm].add('patch')
+
+                    candidate_paths = [
+                        inp.get('file_path'),
+                        inp.get('notebook_path'),
+                        inp.get('path'),
+                        inp.get('workdir'),
+                    ]
+                    for fp in candidate_paths:
+                        norm = normalize_path(fp)
+                        if norm:
+                            files.add(norm)
+                            ops[norm].add(tool.lower())
+
+                    cmd = inp.get('cmd') or inp.get('command') or ""
+                    for m in FILE_PATH_RE.finditer(cmd):
+                        fp = m.group(1).rstrip('.,;:')
+                        norm = normalize_path(fp)
+                        if norm:
+                            files.add(norm)
+                            ops[norm].add(tool.lower())
+                else:
+                    if obj.get('sessionId'):
+                        session_id = obj['sessionId']
+
+                    ts_str = obj.get('timestamp')
+                    if ts_str and not start_time:
+                        try:
+                            start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        except (ValueError, TypeError):
+                            pass
+
+                    if obj.get('type') == 'user':
+                        user_msg_count += 1
+                        if first_user_msg is None:
+                            raw = recall_day.extract_text(obj.get('message', {}).get('content', ''))
+                            cleaned = recall_day.clean_content(raw)
+                            if cleaned and len(cleaned) >= 5:
+                                first_user_msg = cleaned
+
+                    if obj.get('type') != 'assistant':
+                        continue
+
+                    content = obj.get('message', {}).get('content', [])
+                    if not isinstance(content, list):
+                        continue
+
+                    for block in content:
+                        if not isinstance(block, dict) or block.get('type') != 'tool_use':
+                            continue
+
+                        tool = block.get('name', '')
+                        inp = block.get('input', {})
+
+                        if tool in ('Read', 'Edit', 'Write', 'NotebookEdit'):
+                            fp = inp.get('file_path') or inp.get('notebook_path', '')
+                            if fp:
+                                norm = normalize_path(fp)
+                                if norm:
+                                    files.add(norm)
+                                    ops[norm].add(tool.lower())
+
+                        elif tool in ('Glob', 'Grep'):
+                            fp = inp.get('path', '')
+                            if fp:
+                                norm = normalize_path(fp)
+                                if norm:
+                                    files.add(norm)
+                                    ops[norm].add('search')
+
+                        elif tool == 'Bash':
+                            cmd = inp.get('command', '')
+                            for m in FILE_PATH_RE.finditer(cmd):
+                                fp = m.group(1).rstrip('.,;:')
+                                norm = normalize_path(fp)
+                                if norm:
+                                    files.add(norm)
+                                    ops[norm].add('bash')
 
     except (OSError, UnicodeDecodeError):
         return None
@@ -211,6 +296,7 @@ def extract_file_paths(jsonl_path: Path) -> dict | None:
         'ops': dict(ops),
         'session_id': session_id,
         'start_time': start_time,
+        'file_mtime': datetime.fromtimestamp(jsonl_path.stat().st_mtime, tz=timezone.utc),
         'title': title,
         'msg_count': user_msg_count,
         'filepath': str(jsonl_path),
@@ -230,10 +316,14 @@ def normalize_path(fp: str) -> str | None:
         if pat.search(fp):
             return None
 
-    if not fp.startswith(VAULT_PREFIX):
+    home_prefix = str(Path.home()) + "/"
+    if fp.startswith(VAULT_PREFIX):
+        rel = fp[len(VAULT_PREFIX):]
+    elif fp.startswith(home_prefix):
+        rel = fp[len(home_prefix):]
+    else:
         return None
 
-    rel = fp[len(VAULT_PREFIX):]
     if not rel:
         return None
 
@@ -282,8 +372,15 @@ def recency_color(t: float) -> str:
     return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 
 
-def build_graph(sessions: list, min_files: int = 3) -> nx.Graph:
+def build_graph(sessions: list, min_files: int = 3):
     """Build graph with noise reduction."""
+    try:
+        import networkx as nx
+    except ImportError as exc:
+        raise SystemExit(
+            "session-graph.py requires networkx. Install it with `pip install networkx pyvis`."
+        ) from exc
+
     G = nx.Graph()
 
     # Count how many sessions reference each file - skip ultra-common ones
@@ -374,8 +471,15 @@ def build_graph(sessions: list, min_files: int = 3) -> nx.Graph:
     return G
 
 
-def render_graph(G: nx.Graph, output_path: str, date_label: str, sessions_meta: dict):
+def render_graph(G, output_path: str, date_label: str, sessions_meta: dict):
     """Render with Obsidian-style theme and interactive features."""
+    try:
+        from pyvis.network import Network
+    except ImportError as exc:
+        raise SystemExit(
+            "session-graph.py requires pyvis. Install it with `pip install networkx pyvis`."
+        ) from exc
+
     net = Network(
         height="100vh",
         width="100%",
@@ -1148,6 +1252,168 @@ def filter_sessions_by_day(sessions: list, day_filter: str) -> list:
     return sessions
 
 
+def select_graph_sessions(sessions: list, min_files: int) -> tuple[list, set]:
+    """Apply the same file-noise and min-file filtering used for the rendered graph."""
+    file_freq = Counter()
+    for session in sessions:
+        for fp in session['files']:
+            file_freq[fp] += 1
+
+    noise_threshold = max(3, len(sessions) * 0.6)
+    noisy_files = {fp for fp, count in file_freq.items() if count > noise_threshold}
+
+    selected = []
+    for session in sessions:
+        clean_files = sorted(session['files'] - noisy_files)
+        if len(clean_files) < min_files:
+            continue
+        enriched = dict(session)
+        enriched['clean_files'] = clean_files
+        selected.append(enriched)
+
+    return selected, noisy_files
+
+
+def slugify_note_name(value: str) -> str:
+    """Create a filesystem- and wikilink-friendly note name stem."""
+    value = value.replace('/', '__')
+    value = re.sub(r'[^A-Za-z0-9._-]+', '-', value)
+    value = re.sub(r'-{2,}', '-', value).strip('-_.')
+    return value or "item"
+
+
+def default_obsidian_export_dir(date_label: str) -> Path | None:
+    """Pick a vault-oriented default export directory when an Obsidian vault is known."""
+    if VAULT_DIR is None:
+        return None
+    return VAULT_DIR / "Session-Graphs" / slugify_note_name(date_label.lower())
+
+
+def file_note_stem(path: str) -> str:
+    """Build a stable markdown note stem for a touched file path."""
+    return f"file-{slugify_note_name(path).replace('.', '_')}"
+
+
+def export_obsidian_graph_artifacts(sessions: list, export_dir: Path, date_label: str, min_files: int) -> dict:
+    """Export native Obsidian graph artifacts as markdown notes linked by wikilinks."""
+    selected, _ = select_graph_sessions(sessions, min_files)
+    export_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = export_dir / ".session-graph-manifest.json"
+    if manifest_path.exists():
+        try:
+            previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for rel in previous.get("files", []):
+                stale = export_dir / rel
+                if stale.exists():
+                    stale.unlink()
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    file_to_sessions = defaultdict(list)
+    session_note_names = {}
+    file_note_names = {}
+    written_files = []
+
+    for session in selected:
+        sid = slugify_note_name(session['session_id'])
+        session_note_names[session['session_id']] = f"session-{sid}"
+        for path in session['clean_files']:
+            file_note_names[path] = file_note_stem(path)
+            file_to_sessions[path].append(session['session_id'])
+
+    for session in selected:
+        note_stem = session_note_names[session['session_id']]
+        note_path = export_dir / f"{note_stem}.md"
+        title = session['title'].replace('"', '\\"')
+        lines = [
+            "---",
+            "type: session-graph-session",
+            f"session_id: {session['session_id']}",
+            f'date: {session["start_time"].strftime("%Y-%m-%d")}',
+            f'time: {session["start_time"].strftime("%H:%M")}',
+            f'title: "{title}"',
+            f"messages: {session['msg_count']}",
+            f"files: {len(session['clean_files'])}",
+            "---",
+            "",
+            f"# {session['title']}",
+            "",
+            f"- Date: {session['start_time'].strftime('%Y-%m-%d %H:%M')}",
+            f"- Messages: {session['msg_count']}",
+            f"- Source file: `{session['filepath']}`",
+            "",
+            "## Files",
+            "",
+        ]
+        for path in session['clean_files']:
+            note = file_note_names[path]
+            label = path.split('/')[-1]
+            lines.append(f"- [[{note}|{label}]]")
+        lines.append("")
+        note_path.write_text("\n".join(lines), encoding="utf-8")
+        written_files.append(note_path.name)
+
+    for path, session_ids in sorted(file_to_sessions.items()):
+        note_stem = file_note_names[path]
+        note_path = export_dir / f"{note_stem}.md"
+        lines = [
+            "---",
+            "type: session-graph-file",
+            f'path: "{path}"',
+            f"session_count: {len(session_ids)}",
+            "---",
+            "",
+            f"# {path.split('/')[-1]}",
+            "",
+            f"- Path: `{path}`",
+            f"- Referenced by: {len(session_ids)} sessions",
+            "",
+            "## Sessions",
+            "",
+        ]
+        for session_id in sorted(session_ids):
+            session_note = session_note_names[session_id]
+            lines.append(f"- [[{session_note}]]")
+        lines.append("")
+        note_path.write_text("\n".join(lines), encoding="utf-8")
+        written_files.append(note_path.name)
+
+    index_path = export_dir / "session-graph-index.md"
+    index_lines = [
+        "---",
+        "type: session-graph-index",
+        f'date_range: "{date_label}"',
+        f"sessions: {len(selected)}",
+        f"files: {len(file_to_sessions)}",
+        "---",
+        "",
+        f"# Session Graph Index",
+        "",
+        f"- Date range: {date_label}",
+        f"- Sessions: {len(selected)}",
+        f"- Files: {len(file_to_sessions)}",
+        "",
+        "## Sessions",
+        "",
+    ]
+    for session in selected:
+        note = session_note_names[session['session_id']]
+        index_lines.append(f"- [[{note}|{session['title']}]]")
+    index_lines.append("")
+    index_path.write_text("\n".join(index_lines), encoding="utf-8")
+    written_files.append(index_path.name)
+    manifest_path.write_text(
+        json.dumps({"files": sorted(written_files)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    return {
+        "sessions": len(selected),
+        "files": len(file_to_sessions),
+        "index_path": index_path,
+    }
+
+
 def main():
     import argparse
 
@@ -1159,6 +1425,7 @@ def main():
     parser.add_argument('--all-projects', action='store_true')
     parser.add_argument('--no-open', action='store_true', help='Do not open browser')
     parser.add_argument('-o', '--output', default=None)
+    parser.add_argument('--obsidian-export', default=None, help='Directory to export native Obsidian markdown graph notes')
 
     args = parser.parse_args()
     date_expr = ' '.join(args.date_expr)
@@ -1178,7 +1445,7 @@ def main():
     skipped = 0
 
     for proj_dir in project_dirs:
-        for filepath in proj_dir.glob("*.jsonl"):
+        for filepath in recall_day.iter_session_jsonl_files(proj_dir):
             try:
                 mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc)
                 if mtime < date_start - timedelta(days=1):
@@ -1199,7 +1466,20 @@ def main():
             if result and result['start_time'] >= date_start and result['start_time'] < date_end:
                 sessions.append(result)
 
-    sessions.sort(key=lambda s: s['start_time'])
+    deduped = {}
+    for session in sessions:
+        current = deduped.get(session['session_id'])
+        current_key = (
+            current['file_mtime'].timestamp(),
+            current['start_time'].timestamp(),
+        ) if current is not None else None
+        session_key = (
+            session['file_mtime'].timestamp(),
+            session['start_time'].timestamp(),
+        )
+        if current is None or session_key > current_key:
+            deduped[session['session_id']] = session
+    sessions = sorted(deduped.values(), key=lambda s: s['start_time'])
 
     if args.day:
         sessions = filter_sessions_by_day(sessions, args.day)
@@ -1217,6 +1497,24 @@ def main():
         'time': s['start_time'].strftime('%H:%M'),
         'msgs': s['msg_count'],
     } for s in sessions}
+
+    obsidian_export_dir = (
+        Path(args.obsidian_export)
+        if args.obsidian_export
+        else default_obsidian_export_dir(date_label)
+    )
+
+    if obsidian_export_dir:
+        export_info = export_obsidian_graph_artifacts(
+            sessions,
+            obsidian_export_dir,
+            date_label,
+            min_files=args.min_files,
+        )
+        print(
+            f"Obsidian export: {export_info['sessions']} session notes, "
+            f"{export_info['files']} file notes -> {export_info['index_path']}"
+        )
 
     G = build_graph(sessions, min_files=args.min_files)
     print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")

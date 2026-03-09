@@ -23,6 +23,14 @@ Run the recall-day script from the skill's scripts directory:
 python3 .claude/skills/recall/scripts/recall-day.py list DATE_EXPR
 ```
 
+If installed in Codex instead of Claude Code, run the same script from `~/.codex/skills/recall/scripts/recall-day.py` or set `SESSION_BACKEND=codex` explicitly when needed.
+
+From the repo checkout, you can also use:
+
+```bash
+uv run python scripts/codex-memory recall-day list DATE_EXPR
+```
+
 Replace `DATE_EXPR` with the parsed date expression. Supported:
 - `yesterday`, `today`
 - `YYYY-MM-DD`
@@ -141,20 +149,42 @@ Strip "graph" prefix from query to get the date expression. Run:
 python3 .claude/skills/recall/scripts/session-graph.py DATE_EXPR
 ```
 
+Codex installs can run the equivalent script from `~/.codex/skills/recall/scripts/session-graph.py`. The graph script now understands both Claude project logs and Codex rollouts.
+
+From the repo checkout, you can also use:
+
+```bash
+uv run python scripts/codex-memory session-graph DATE_EXPR
+```
+
 Options:
 - `--min-files N` - only show sessions touching N+ files (default: 2, use 5+ for cleaner graphs)
 - `--min-msgs N` - filter noise (default: 3)
 - `--all-projects` - scan all projects
 - `-o PATH` - custom output path (default: /tmp/session-graph.html)
 - `--no-open` - don't auto-open browser
+- `--obsidian-export DIR` - export native Obsidian markdown graph notes
 
 Opens interactive HTML in browser. Session nodes colored by day, file nodes colored by folder.
 Tell the user the node/edge counts and what to look for (clusters, shared files).
 
+When `--obsidian-export DIR` is set, also generate:
+- session notes
+- file notes
+- an index note
+
+These are linked with wikilinks so Obsidian's graph view can render the session/file network natively.
+
+If `--obsidian-export` is omitted and `VAULT_DIR` is set (or the current working directory is inside an Obsidian vault), the export defaults to:
+
+```text
+<vault>/Session-Graphs/<date-range-slug>/
+```
+
 ## Notes
 
 - Temporal queries go through `recall-day.py` (native JSONL, no QMD needed)
-- Graph queries go through `session-graph.py` (NetworkX + pyvis)
+- Graph queries go through `session-graph.py` (NetworkX + pyvis, Claude Code and Codex rollout support)
 - Topic queries use BM25 (`qmd search`) NOT hybrid (`qmd query`) - 53x faster
 - Run all 3 collection searches in parallel to keep response time fast
 - If a result is truncated or you need more context, fetch with `-l 100` or higher
