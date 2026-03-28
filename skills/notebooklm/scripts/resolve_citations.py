@@ -79,7 +79,7 @@ def build_chunk_map(references: list[dict]) -> dict[int, dict]:
     seen_texts = {}
     chunks = {}  # 1-based index -> ref
     for ref in references:
-        key = ref.get("cited_text", "")[:100]
+        key = (ref.get("cited_text") or "")[:100]
         if key and key not in seen_texts:
             idx = len(seen_texts) + 1
             seen_texts[key] = idx
@@ -109,7 +109,7 @@ def resolve_answer(answer: str, references: list[dict], source_map: dict[str, st
         nonlocal passage_hits, passage_misses
         if passage_map and ref:
             sid = ref["source_id"]
-            chunk_key = ref.get("cited_text", "")[:100]
+            chunk_key = (ref.get("cited_text") or "")[:100]
             source_passages = passage_map.get(sid, {})
             passage_num = source_passages.get(chunk_key)
             if passage_num:
@@ -136,7 +136,7 @@ def resolve_answer(answer: str, references: list[dict], source_map: dict[str, st
             # With passage links, dedup by (source, passage) so different
             # passages from the same source each get their own link.
             # Without passages, dedup by source only.
-            chunk_key = ref.get("cited_text", "")[:100]
+            chunk_key = (ref.get("cited_text") or "")[:100]
             passage_num = None
             if passage_map:
                 source_passages = passage_map.get(sid, {})
