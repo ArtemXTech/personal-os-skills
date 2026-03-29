@@ -5,6 +5,8 @@ description: Import NotebookLM notebooks into your Obsidian vault as linked know
 
 # NotebookLM - Vault Knowledge Graph
 
+> **Claude Code CLI only.** This skill runs Python scripts via Bash and requires `notebooklm-py` + Playwright installed locally. It will not work in Claude Cowork or other browser-based interfaces — those fall back to Computer Use, which cannot substitute for local subprocess execution.
+
 Turn NotebookLM notebooks into persistent, linked vault knowledge. Sources become files you can `[[wikilink]]`, Q&A answers get `[N]` citations resolved to those wikilinks, dashboards tie it all together.
 
 ## Prerequisites
