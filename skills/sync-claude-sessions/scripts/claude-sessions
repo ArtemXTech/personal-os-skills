@@ -49,7 +49,7 @@ def _detect_sessions_dir():
     return projects
 
 VAULT_DIR = _detect_vault_dir()
-OUTPUT_DIR = VAULT_DIR / "Claude-Sessions"
+OUTPUT_DIR = VAULT_DIR / os.environ.get("CLAUDE_SESSIONS_DIR", "Claude-Sessions")
 SKILLS_DIR = VAULT_DIR / ".claude" / "skills"
 SESSIONS_DIR = _detect_sessions_dir()
 
