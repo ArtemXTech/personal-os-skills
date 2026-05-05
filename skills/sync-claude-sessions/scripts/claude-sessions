@@ -33,15 +33,21 @@ def _detect_vault_dir():
             return parent
     return cwd
 
+def _claude_config_dir() -> Path:
+    """Return the Claude config dir, respecting CLAUDE_CONFIG_DIR (default ~/.claude)."""
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(env).expanduser() if env else Path.home() / ".claude"
+
+
 def _detect_sessions_dir():
     """Auto-detect Claude project sessions directory from CWD."""
     cwd = str(Path.cwd())
     encoded = cwd.replace("/", "-")
-    candidate = Path.home() / ".claude" / "projects" / encoded
+    projects = _claude_config_dir() / "projects"
+    candidate = projects / encoded
     if candidate.is_dir():
         return candidate
     # Fallback: most recently modified project dir
-    projects = Path.home() / ".claude" / "projects"
     if projects.is_dir():
         dirs = sorted([d for d in projects.iterdir() if d.is_dir()], key=lambda d: d.stat().st_mtime, reverse=True)
         if dirs:
