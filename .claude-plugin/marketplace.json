@@ -70,7 +70,32 @@
       "strict": false,
       "skills": [
         "./skills/sync-claude-sessions"
-      ]
+      ],
+      "hooks": {
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/sync-claude-sessions/scripts/claude-sessions sync",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/sync-claude-sessions/scripts/claude-sessions sync",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

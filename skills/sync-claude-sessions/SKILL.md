@@ -7,11 +7,20 @@ description: Sync Claude Code sessions to Obsidian markdown. Export, resume, add
 
 Export Claude Code conversations to Obsidian for observability and analysis.
 
+## Live Sync
+
+Hooks (`UserPromptSubmit`, `Stop`) are declared inline on the plugin entry in
+[`.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json) and
+registered automatically when the plugin is enabled. No setup required.
+
 ## Quick Reference
 
 ```bash
-# Alias (add to ~/.zshrc) — respects CLAUDE_CONFIG_DIR if set
-alias cs='python3 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/sync-claude-sessions/scripts/claude-sessions"'
+# Optional shell alias — point it at wherever the plugin script lives.
+# Find the path:
+#   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" \
+#     -path '*sync-claude-sessions/scripts/claude-sessions' 2>/dev/null
+alias cs='python3 /absolute/path/to/sync-claude-sessions/scripts/claude-sessions'
 
 # Common commands
 cs list                    # Active sessions
@@ -37,7 +46,6 @@ cs close "done"            # Mark session done
 
 | Task | Workflow |
 |------|----------|
-| Enable live sync hooks | [workflows/setup.md](workflows/setup.md) |
 | Log/annotate session | [workflows/log-session.md](workflows/log-session.md) |
 
 ## Output
