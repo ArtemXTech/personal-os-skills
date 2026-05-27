@@ -305,7 +305,7 @@ def resolve_answer(answer, references, source_map, slug, vault=None):
     anchor_map = {}
     seen_anchors = {}  # anchor_id -> first citation_number (dedup)
     for n, ref in cn_map.items():
-        cited_text = ref.get("cited_text", "").strip()
+        cited_text = (ref.get("cited_text") or "").strip()
         if not cited_text:
             continue
         remapped_sid = remap.get(n, ref["source_id"]) if remap else ref["source_id"]

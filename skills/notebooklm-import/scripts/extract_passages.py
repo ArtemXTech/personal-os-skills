@@ -55,7 +55,7 @@ def main():
         with open(qa_file) as f:
             data = json.load(f)
         for ref in data["references"]:
-            ct = ref.get("cited_text", "").strip()
+            ct = (ref.get("cited_text") or "").strip()
             if not ct:
                 continue
             sid = ref["source_id"]
