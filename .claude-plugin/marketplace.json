@@ -1,8 +1,7 @@
 {
   "name": "personal-os-skills",
   "owner": {
-    "name": "Artem Zhutov",
-    "email": "artem.zhutov.perfected618@simplelogin.com"
+    "name": "Artem Zhutov"
   },
   "metadata": {
     "description": "Claude Code skills for Personal OS workflows with Obsidian",
@@ -70,6 +69,15 @@
       "strict": false,
       "skills": [
         "./skills/sync-claude-sessions"
+      ]
+    },
+    {
+      "name": "chief-of-ai-skill",
+      "description": "Route work to persistent specialist agents and verify the returned result",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/chief-of-ai"
       ]
     }
   ]

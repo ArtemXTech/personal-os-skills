@@ -26,6 +26,7 @@ Claude Code skills for Obsidian workflows.
 | [notebooklm-import](skills/notebooklm-import/) | Import NotebookLM notebooks into Obsidian as linked knowledge graphs | [Video](https://youtu.be/qiOu7Ptjxng) |
 | [recall](skills/recall/) | Load context from previous sessions - temporal, topic search (QMD), graph visualization | [Video](https://youtu.be/RDoTY4_xh0s) · [Setup](docs/memory-skills-setup.md) |
 | [sync-claude-sessions](skills/sync-claude-sessions/) | Export Claude Code conversations to Obsidian markdown with auto-sync hooks | [Setup](docs/memory-skills-setup.md) |
+| [chief-of-ai](skills/chief-of-ai/) | Route work to persistent specialist agents and verify the returned result | [Setup](skills/chief-of-ai/README.md) |
 
 ## Links
 
