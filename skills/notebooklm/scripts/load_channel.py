@@ -181,7 +181,9 @@ async def load_videos(videos_file: str, notebook_id: str, count: int, concurrenc
     """Load videos into NotebookLM in parallel."""
     from notebooklm import NotebookLMClient
 
-    videos = json.load(open(videos_file))[skip:skip + count]
+    with open(videos_file) as vf:
+
+        videos = json.load(vf)[skip:skip + count]
     total = len(videos)
     print(f"Loading {total} videos into {notebook_id} (concurrency={concurrency}, skip={skip})")
 
