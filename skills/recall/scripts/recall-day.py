@@ -8,8 +8,8 @@ Usage:
 DATE_EXPR examples: yesterday, today, 2026-02-25, "last tuesday", "this week",
                     "last week", "3 days ago", "last 3 days"
 
-Every Claude Code user has JSONL session files in ~/.claude/projects/.
-No custom setup needed.
+Every Claude Code user has JSONL session files in $CLAUDE_CONFIG_DIR/projects/
+(default: ~/.claude/projects/). No custom setup needed.
 """
 
 import argparse
@@ -20,7 +20,14 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
+
+def _claude_config_dir() -> Path:
+    """Return the Claude config dir, respecting CLAUDE_CONFIG_DIR (default ~/.claude)."""
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(env).expanduser() if env else Path.home() / ".claude"
+
+
+CLAUDE_PROJECTS = _claude_config_dir() / "projects"
 
 # Reuse from extract-sessions.py
 STRIP_PATTERNS = [
