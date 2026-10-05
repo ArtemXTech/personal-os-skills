@@ -2,7 +2,7 @@
 
 Claude Code skills for Obsidian workflows.
 
-> **Claude Code x Obsidian Lab** - 5 weeks, 10 live sessions. Starts April 28. [lab.artemzhutov.com](https://lab.artemzhutov.com/)
+> 📚 **Take control over your life. Point B, 14-day sprint on personal AI agents, starts Nov 3:** [lab.artemzhutov.com](https://lab.artemzhutov.com/)
 
 ## Installation
 
