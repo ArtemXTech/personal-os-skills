@@ -4,7 +4,7 @@ Enable automatic syncing of Claude Code sessions to Obsidian.
 
 ## 1. Add Hooks to Settings
 
-Edit `~/.claude/settings.json`:
+Edit `$CLAUDE_CONFIG_DIR/settings.json` (default: `~/.claude/settings.json`):
 
 ```json
 {

@@ -10,8 +10,8 @@ Export Claude Code conversations to Obsidian for observability and analysis.
 ## Quick Reference
 
 ```bash
-# Alias (add to ~/.zshrc)
-alias cs="python3 ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions"
+# Alias (add to ~/.zshrc) — respects CLAUDE_CONFIG_DIR if set
+alias cs='python3 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/sync-claude-sessions/scripts/claude-sessions"'
 
 # Common commands
 cs list                    # Active sessions
