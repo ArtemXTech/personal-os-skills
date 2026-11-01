@@ -2,7 +2,7 @@
 
 Claude Code skills for Obsidian workflows.
 
-> 📚 **Take control over your life. Claude Code x Obsidian Lab, 5 weeks live, starts Nov 10:** [lab.artemzhutov.com](https://lab.artemzhutov.com/)
+> 📚 **Take control over your life. Claude Code x Obsidian Lab, 4 weeks live, starts Nov 10:** [lab.artemzhutov.com](https://lab.artemzhutov.com/)
 
 ## Installation
 
