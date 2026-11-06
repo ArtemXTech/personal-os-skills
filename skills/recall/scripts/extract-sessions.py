@@ -25,15 +25,21 @@ import argparse
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+def _claude_config_dir():
+    """Return the Claude config dir, respecting CLAUDE_CONFIG_DIR (default ~/.claude)."""
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    return os.path.expanduser(env) if env else os.path.expanduser("~/.claude")
+
+
 def _detect_default_source():
     """Auto-detect Claude project directory from CWD."""
     cwd = os.getcwd()
     encoded = cwd.replace("/", "-")
-    candidate = os.path.expanduser(f"~/.claude/projects/{encoded}")
+    projects_dir = os.path.join(_claude_config_dir(), "projects")
+    candidate = os.path.join(projects_dir, encoded)
     if os.path.isdir(candidate):
         return candidate
     # Fallback: first project dir that exists
-    projects_dir = os.path.expanduser("~/.claude/projects")
     if os.path.isdir(projects_dir):
         dirs = [d for d in os.listdir(projects_dir) if os.path.isdir(os.path.join(projects_dir, d))]
         if dirs:
